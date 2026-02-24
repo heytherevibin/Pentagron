@@ -5,7 +5,11 @@
       "Bash(test -d \"c:/Users/MATHEV03/Downloads/Code/pegatron\")",
       "Bash(git init)",
       "Bash(git remote add origin https://github.com/heytherevibin/Pentagron.git)",
-      "Bash(git add CLAUDE.md LICENSE CHANGELOG.md README.md .gitignore .env.example Makefile docker-compose.yml docker-compose.dev.yml docker-compose.observability.yml backend/ frontend/ mcp-servers/ docker/ .claude/)"
+      "Bash(git add CLAUDE.md LICENSE CHANGELOG.md README.md .gitignore .env.example Makefile docker-compose.yml docker-compose.dev.yml docker-compose.observability.yml backend/ frontend/ mcp-servers/ docker/ .claude/)",
+      "Bash(git add .gitattributes)",
+      "Bash(git commit -m \"feat: initial Pentagron scaffold — Phase 1 complete:*)",
+      "Bash(git branch -M main)",
+      "Bash(git push -u origin main)"
     ]
   }
 }
