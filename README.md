@@ -1,6 +1,6 @@
 <div align="center">
 
-# PENTAGRON
+<img src="assets/logo.png" alt="Pentagron" width="480" />
 
 ### Autonomous AI Penetration Testing Framework
 
