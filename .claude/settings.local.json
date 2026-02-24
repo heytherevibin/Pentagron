@@ -9,7 +9,12 @@
       "Bash(git add .gitattributes)",
       "Bash(git commit -m \"feat: initial Pentagron scaffold — Phase 1 complete:*)",
       "Bash(git branch -M main)",
-      "Bash(git push -u origin main)"
+      "Bash(git push -u origin main)",
+      "Bash(magick --version)",
+      "Bash(convert --version)",
+      "Bash(python3 -c \"from PIL import Image; print\\(''pillow ok''\\)\")",
+      "Bash(python -c \"from PIL import Image; print\\(''pillow ok''\\)\")",
+      "Bash(python -c \":*)"
     ]
   }
 }
