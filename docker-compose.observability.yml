@@ -1,0 +1,36 @@
+version: "3.9"
+
+# Optional observability stack
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.observability.yml up
+
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pentagron-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - pentagron-core
+
+  langfuse-server:
+    image: langfuse/langfuse:latest
+    container_name: pentagron-langfuse
+    restart: unless-stopped
+    ports:
+      - "4000:3000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-pentagron}:${POSTGRES_PASSWORD:-pentagron}@postgres:5432/${POSTGRES_DB:-pentagron}
+      - NEXTAUTH_SECRET=${JWT_SECRET:-changeme}
+      - SALT=${JWT_SECRET:-changeme}
+    depends_on:
+      - postgres
+    networks:
+      - pentagron-core
+
+volumes:
+  grafana-data:

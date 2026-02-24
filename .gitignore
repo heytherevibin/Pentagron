@@ -1,0 +1,111 @@
+# ════════════════════════════════════════════════════════════════════════════════
+# Pentagron — .gitignore
+# ════════════════════════════════════════════════════════════════════════════════
+
+# ── Secrets & credentials ─────────────────────────────────────────────────────
+.env
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+id_rsa
+id_ed25519
+*.secret
+
+# ── Go ────────────────────────────────────────────────────────────────────────
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+vendor/
+coverage.out
+coverage.html
+*.test
+*.prof
+__debug_bin*
+
+# ── Node.js / Frontend ────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+build/
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.pnp.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# (compose files are committed; only local override secrets are ignored)
+docker-compose.override.yml
+
+# ── Databases ─────────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+postgres-data/
+neo4j-data/
+redis-data/
+
+# ── Pentest artifacts (never commit loot or captures) ─────────────────────────
+loot/
+captures/
+*.pcap
+*.pcapng
+reports/generated/
+screenshots/
+wordlists/custom/
+hashcat.potfile
+john.pot
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/*
+# Keep Claude Code permissions file
+!.vscode/settings.local.json
+
+# ── Claude Code ───────────────────────────────────────────────────────────────
+# Keep project-local memory, plans, and settings — exclude session histories
+.claude/*.jsonl
+.claude/fde*/
+.claude/9eb*/
+
+# ── Temporary ─────────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+tmp/
+temp/
+
+# ── Air (Go hot-reload) ───────────────────────────────────────────────────────
+.air.toml
+tmp/
+
+# ── Grafana / Langfuse data ───────────────────────────────────────────────────
+grafana-data/
+langfuse-data/

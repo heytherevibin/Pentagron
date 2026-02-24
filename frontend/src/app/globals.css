@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0e1a;
+  --surface: #111827;
+  --border: #1f2937;
+  --primary: #00ff88;
+  --danger: #ff4444;
+  --warning: #ffaa00;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg);
+  color: #f1f5f9;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Terminal-style scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+/* Severity badges */
+.severity-critical { @apply bg-red-900 text-red-200 border border-red-700; }
+.severity-high     { @apply bg-orange-900 text-orange-200 border border-orange-700; }
+.severity-medium   { @apply bg-yellow-900 text-yellow-200 border border-yellow-700; }
+.severity-low      { @apply bg-blue-900 text-blue-200 border border-blue-700; }
+.severity-info     { @apply bg-gray-800 text-gray-300 border border-gray-600; }
+
+/* Active attack chain pulse */
+.chain-active {
+  animation: pulse-orange 2s ease-in-out infinite;
+}
+
+@keyframes pulse-orange {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(251, 146, 60, 0); }
+}

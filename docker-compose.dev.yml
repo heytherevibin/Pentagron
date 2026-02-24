@@ -1,0 +1,39 @@
+version: "3.9"
+
+# Development overrides — hot reload, volume mounts, debug ports
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  pentagron-backend:
+    build:
+      target: dev
+    volumes:
+      - ./backend:/app
+    environment:
+      - GIN_MODE=debug
+      - LOG_LEVEL=debug
+    command: ["air", "-c", ".air.toml"]
+
+  pentagron-frontend:
+    build:
+      target: dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+    command: ["npm", "run", "dev"]
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  neo4j:
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+
+  redis:
+    ports:
+      - "6379:6379"

@@ -1,0 +1,196 @@
+version: "3.9"
+
+services:
+  # ── Backend ──────────────────────────────────────────────────────────────────
+  pentagron-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pentagron-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file: .env
+    environment:
+      - DOCKER_SOCKET=/var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pentagron-core
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+  pentagron-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pentagron-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8080
+    depends_on:
+      - pentagron-backend
+    networks:
+      - pentagron-core
+
+  # ── Kali Sandbox ─────────────────────────────────────────────────────────────
+  kali-sandbox:
+    build:
+      context: ./docker/kali
+      dockerfile: Dockerfile
+    container_name: pentagron-kali
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    command: tail -f /dev/null
+    networks:
+      - pentagron-core
+      - pentagron-tools
+
+  # ── MCP Servers ──────────────────────────────────────────────────────────────
+  mcp-metasploit:
+    build:
+      context: ./mcp-servers/metasploit
+      dockerfile: Dockerfile
+    container_name: pentagron-mcp-metasploit
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    environment:
+      - MCP_PORT=8003
+      - MSF_HOST=kali-sandbox
+    depends_on:
+      - kali-sandbox
+    networks:
+      - pentagron-core
+      - pentagron-tools
+
+  mcp-nuclei:
+    build:
+      context: ./mcp-servers/nuclei
+      dockerfile: Dockerfile
+    container_name: pentagron-mcp-nuclei
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      - MCP_PORT=8002
+    networks:
+      - pentagron-core
+      - pentagron-tools
+
+  mcp-naabu:
+    build:
+      context: ./mcp-servers/naabu
+      dockerfile: Dockerfile
+    container_name: pentagron-mcp-naabu
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MCP_PORT=8000
+    networks:
+      - pentagron-core
+      - pentagron-tools
+
+  mcp-sqlmap:
+    build:
+      context: ./mcp-servers/sqlmap
+      dockerfile: Dockerfile
+    container_name: pentagron-mcp-sqlmap
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - MCP_PORT=8001
+    networks:
+      - pentagron-core
+      - pentagron-tools
+
+  # ── Databases ────────────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: pentagron-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    env_file: .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-pentagron}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-pentagron}
+      - POSTGRES_DB=${POSTGRES_DB:-pentagron}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - pentagron-core
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pentagron}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  neo4j:
+    image: neo4j:5
+    container_name: pentagron-neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-pentagron}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    networks:
+      - pentagron-core
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: pentagron-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - pentagron-core
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres-data:
+  neo4j-data:
+  neo4j-logs:
+  redis-data:
+
+networks:
+  pentagron-core:
+    driver: bridge
+  pentagron-tools:
+    driver: bridge
