@@ -33,7 +33,7 @@ jobs:
         working-directory: backend
         run: go test -race -count=1 -timeout=60s ./...
         env:
-          CGO_ENABLED: "0"
+          CGO_ENABLED: "1"
 
   # ── Frontend: build + lint ─────────────────────────────────────────────────
   frontend:
