@@ -1,4 +1,4 @@
-.PHONY: up down dev build rebuild logs test lint migrate clean help
+.PHONY: up down dev build rebuild logs test test-e2e lint migrate clean help
 
 COMPOSE        := docker-compose -f docker-compose.yml
 COMPOSE_DEV    := $(COMPOSE) -f docker-compose.dev.yml
@@ -71,6 +71,9 @@ test: ## Run Go tests
 
 test-cover: ## Run Go tests with coverage report
 	cd $(BACKEND_DIR) && go test ./... -coverprofile=coverage.out && go tool cover -html=coverage.out
+
+test-e2e: ## Run end-to-end integration tests (requires: make up)
+	cd $(BACKEND_DIR) && go test -tags=integration ./integration/... -v -timeout=120s
 
 ## ── Linting ───────────────────────────────────────────────────────────────────
 lint: ## Run golangci-lint on backend

@@ -6,7 +6,7 @@ an autonomous ReAct agent loop, multi-provider LLM gateway, EvoGraph attack-chai
 and a suite of MCP-wrapped offensive security tools into a single deployable monorepo.
 
 ## Stack
-- **Backend**: Go 1.23, Gin, GORM, module `github.com/pentagron/pentagron`
+- **Backend**: Go 1.24, Gin, GORM, module `github.com/pentagron/pentagron`
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Graph DB**: Neo4j 5 (EvoGraph + recon graph)
 - **Vector DB**: PostgreSQL 16 + pgvector
@@ -35,6 +35,10 @@ and a suite of MCP-wrapped offensive security tools into a single deployable mon
 | `backend/pkg/tools/executor.go` | Built-in tools wired up |
 | `backend/pkg/mcp/client.go` | MCP HTTP/SSE client |
 | `backend/pkg/api/router.go` | All Gin routes |
+| `backend/pkg/api/handlers/workers.go` | Worker register/poll/result handlers |
+| `backend/pkg/agent/prompts/post_exploitation.tmpl` | Post-exploit agent prompt |
+| `backend/pkg/mtls/mtls.go` | Mutual TLS helpers (server + client configs, TLS 1.3) |
+| `backend/integration/e2e_test.go` | End-to-end integration tests (build tag: integration) |
 | `backend/cmd/server/main.go` | Dependency wiring + server start |
 
 ## Service Ports
@@ -58,7 +62,8 @@ and a suite of MCP-wrapped offensive security tools into a single deployable mon
 make env-setup   # copy .env.example → .env
 make up          # start all containers
 make dev         # hot-reload backend + frontend
-make test        # run Go tests
+make test        # run Go unit tests (no integration tag)
+make test-e2e    # run end-to-end tests (requires: make up)
 make lint        # golangci-lint
 make tidy        # go mod tidy
 ```
@@ -84,13 +89,8 @@ Architecture plans live in `.claude/plans/`.
 Update these files when you make significant architectural changes.
 
 ## Current Status
-Phases 1-3 complete. Backend, frontend (Mission Control UI), and security hardening are all built. Both `go build ./...` and `npm run build` pass clean.
+Phases 1-4 complete (100%). All pipeline phases implemented including post-exploitation and air-gapped worker mTLS. CI/CD, unit tests, integration tests, worker HTTP comms, observability (Grafana + Langfuse), and mutual TLS are all shipped. Both `go build ./...` and `npm run build` pass clean.
 
 ## Next Implementation Steps
 1. `make env-setup && make up` — boot all containers and smoke test
-2. End-to-end integration test: login → project → flow → start → approve → complete
-3. Implement EvoGraph read API endpoint for real-time graph visualization
-4. PDF report export (backend-generated with Pentagron branding)
-5. Grafana dashboard templates for agent metrics
-6. Langfuse tracing integration
-7. Air-gapped worker node mutual TLS
+2. `make test-e2e` — run end-to-end integration tests against live stack

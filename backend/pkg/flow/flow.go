@@ -153,14 +153,16 @@ func (e *FlowEngine) Run(ctx context.Context, flowID string) error {
 		}
 
 		// Dispatch phase execution
+		taskDesc := PhaseDescription(phase, objective, scope)
 		var phaseErr error
-		if phase == "recon" {
-			// recon is handled by the Orchestrator (imported by recon package to avoid cycle)
-			// We call the runner directly here with the full recon task description
-			taskDesc := PhaseDescription(phase, objective, scope)
+		switch phase {
+		case "post_exploitation":
+			// Post-exploitation uses the dedicated post_exploitation agent which has
+			// access to session management tools (msf_sessions_list, msf_session_cmd).
+			// It auto-runs after the exploitation approval — no second approval gate.
+			e.log.Info("dispatching post-exploitation agent", zap.String("flow_id", flowID))
 			_, phaseErr = e.runner.Run(ctx, flowID, PhaseAgent[phase], phase, taskDesc, projectID)
-		} else {
-			taskDesc := PhaseDescription(phase, objective, scope)
+		default:
 			_, phaseErr = e.runner.Run(ctx, flowID, PhaseAgent[phase], phase, taskDesc, projectID)
 		}
 

@@ -6,8 +6,9 @@
 
 **Production-grade, fully automated security assessment platform powered by multi-agent AI orchestration**
 
+[![CI](https://github.com/heytherevibin/Pentagron/actions/workflows/ci.yml/badge.svg)](https://github.com/heytherevibin/Pentagron/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org)
 [![Docker](https://img.shields.io/badge/Docker-required-2496ED?logo=docker)](https://docker.com)
 [![Neo4j](https://img.shields.io/badge/Neo4j-5-008CC1?logo=neo4j)](https://neo4j.com)
@@ -143,7 +144,7 @@ Manual penetration testing is slow, inconsistent, and does not scale. Experience
 | **1. Reconnaissance** | Automated | Domain discovery, port scanning, HTTP probing, technology fingerprinting, vulnerability scanning, secret detection | subfinder, naabu, httpx, nuclei (9,000+ templates), katana |
 | **2. Analysis** | AI-Driven | CVE correlation, attack path classification, exploit feasibility scoring, EvoGraph query | LLM reasoning, Neo4j Cypher |
 | **3. Exploitation** | Approved | CVE-based exploits, credential attacks, SQL injection, web application attacks | Metasploit, SQLMap, Hydra, custom exploits |
-| **4. Post-Exploitation** | Approved | Lateral movement, privilege escalation, credential harvesting, domain enumeration | Impacket, evil-winrm, bloodhound, crackmapexec |
+| **4. Post-Exploitation** | Auto (after exploitation) | Session enumeration, privilege escalation, credential harvesting, lateral movement reachability | `msf_sessions_list`, `msf_session_cmd`, `shell` |
 | **5. Reporting** | Automated | MITRE ATT&CK mapping, CVSS scoring, compliance mapping, remediation roadmap | Reporter agent, LLM synthesis |
 
 ### Attack Path Classification
@@ -325,6 +326,15 @@ Copy `.env.example` to `.env` and configure. Variables marked **Required** have 
 | `MCP_NUCLEI_URL` | `http://mcp-nuclei:8002` |
 | `MCP_METASPLOIT_URL` | `http://mcp-metasploit:8003` |
 
+### Worker Node mTLS
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WORKER_MTLS_ENABLED` | `false` | Start a second TLS listener on `:8443` for worker nodes |
+| `WORKER_TLS_CA` | — | Path to PEM-encoded CA certificate (shared by server + workers) |
+| `WORKER_TLS_CERT` | — | Path to this process's PEM-encoded certificate |
+| `WORKER_TLS_KEY` | — | Path to this process's PEM-encoded private key |
+
 ---
 
 ## API Reference
@@ -394,6 +404,16 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | `GET` | `/api/health/mcp` | MCP server health |
 | `GET` | `/api/health/all` | Aggregate health (LLM + MCP + DB + Docker) |
 | `GET` | `/api/activity` | Recent activity feed |
+
+### Worker Nodes
+
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| `POST` | `/api/workers/register` | Register worker node `{id, hostname, capabilities[]}` |
+| `GET` | `/api/workers/:worker_id/tasks` | Poll for next pending task (heartbeat) |
+| `POST` | `/api/workers/:worker_id/results` | Submit tool execution result `{task_id, output, error, success}` |
+
+Worker nodes connect to the plain HTTP port (`:8080`) by default. When `WORKER_MTLS_ENABLED=true` and all three cert paths are set, the server also listens on `:8443` with mutual TLS (TLS 1.3, `RequireAndVerifyClientCert`). Pass `-tls-ca/-tls-cert/-tls-key` flags to the worker binary to enable the mTLS client.
 
 ### WebSocket Endpoints
 

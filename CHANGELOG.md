@@ -9,13 +9,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned
-- End-to-end integration tests
-- Grafana dashboard templates
-- Langfuse tracing integration
-- Air-gapped worker node mutual TLS
-- EvoGraph read API endpoint for real-time graph visualization
-- PDF report export (backend-generated with Pentagron branding)
+---
+
+## [0.3.0] - 2026-02-25
+
+### Added
+
+#### Observability
+- **Langfuse tracing** (`backend/pkg/telemetry/langfuse.go`) — lightweight HTTP batch client posting generation/span events to Langfuse ingestion API v2. Activated via `LANGFUSE_ENABLED=true`. Buffered (10 events), async goroutine flush, graceful drain on shutdown
+- **LLM tracing** — every `llm.Manager.Chat()` call automatically records a Langfuse generation event with provider, model, prompt snippet (≤2KB), completion, token counts, and latency. Wired via `manager.WithTracer()`
+- **Grafana provisioning** (`docker/grafana/`) — datasource YAML and dashboard provider auto-loaded on container start; no manual import required
+- **Grafana agent-metrics dashboard** (`docker/grafana/dashboards/agent-metrics.json`) — 8 panels: total/active/completed flows, critical findings (24h), pending approvals, tool calls (24h), flows per hour (bar chart), flow status distribution (pie), tool calls per hour by tool (time series), tool performance table (avg/max latency + success %), findings by severity (pie + time series), recent flows table
+- **Grafana volume mounts** — `docker-compose.observability.yml` now mounts `./docker/grafana/provisioning` and `./docker/grafana/dashboards` read-only into the container
+
+#### Reports
+- **PDF report export** — `GET /api/flows/:id/report?format=pdf` returns a branded A4 PDF (`github.com/jung-kurt/gofpdf`). Dark theme with emerald Pentagron header, severity-colour-coded findings table (critical=red, high=orange, medium=yellow, low=green), tool timeline with PASS/FAIL colour coding, confidentiality footer with page numbers
+- **JSON report format** — `?format=json` returns structured `{flow, findings, actions, markdown}` object alongside the markdown string
+- Report endpoint now supports three formats via `?format=pdf|json|markdown` (markdown is the default)
+
+#### EvoGraph
+- **EvoGraph read API** (`GET /api/flows/:id/graph`) — executes real Neo4j Cypher queries (`MATCH (c:AttackChain)-[r:HAS_NODE]->(n)`), returns D3-compatible `{nodes, edges}` JSON for real-time graph visualisation in Mission Control
+
+#### Testing
+- **Handler integration tests** (`backend/pkg/api/handlers/integration_test.go`) — 12 tests, all passing. Uses `github.com/glebarez/sqlite` (pure-Go, no CGO) in-memory DB with `gen_random_uuid()` and `NOW()` registered as SQLite scalar functions to match PostgreSQL raw SQL. Covers: health, login success/wrong-password/unknown-email, auth guard, project CRUD, flow CRUD, ownership isolation (403 enforcement), approval list, report in all three formats (markdown/PDF/JSON)
+
+#### CI/CD
+- **GitHub Actions** (`.github/workflows/ci.yml`) — triggers on push and PR to `main`. Three parallel jobs: `backend` (`go build + go test -race`), `frontend` (`npm ci + next build + eslint`), `lint` (`golangci-lint`). Go 1.24 + Node 20, module/npm cache, SQLite CGO-free test environment
+
+#### Unit Tests
+- **`pkg/llm/manager_test.go`** — fallback chain routing, provider registration order, prompt snippet truncation
+- **`pkg/agent/reflector_test.go`** — free-text drift detection, redirect message construction, tool-call passthrough
+- **`pkg/telemetry/langfuse_test.go`** — disabled no-op (zero HTTP calls), batch accumulation, flush behaviour
+
+#### Worker Node
+- **Worker HTTP registration** — worker announces itself to the main server on startup (`POST /api/workers/register`) with ID, hostname, capabilities list, and tool inventory
+- **Task polling** — worker long-polls for pending tool tasks (`GET /api/workers/:id/tasks`, 5 s interval); executes via existing `tools.Executor`; posts results back (`POST /api/workers/:id/results`)
+- **Worker API handlers** (`backend/pkg/api/handlers/workers.go`) — `RegisterWorker`, `PollWorkerTasks`, `SubmitWorkerResult`
+- **WorkerNode + WorkerTask models** (`backend/pkg/database/models.go`) — GORM models with status tracking and result storage
+- **New routes in router** — worker endpoints under `/api/workers/`
+
+#### Post-Exploitation Phase
+- **Post-exploitation agent** — explicit phase dispatch in `flow.go` for `"post_exploitation"`. Uses dedicated `AgentTypePostExploit` with tools: `shell`, `msf_session_cmd`, `msf_sessions_list`. Auto-runs after exploitation approval (no second gate)
+- **Post-exploitation prompt template** (`backend/pkg/agent/prompts/post_exploitation.tmpl`) — structured objectives: enumerate active sessions, attempt privilege escalation, harvest credentials (LSASS, SAM, /etc/shadow), establish persistence, lateral movement enumeration
+
+#### Air-gapped Worker Mutual TLS
+
+- **`pkg/mtls` package** (`backend/pkg/mtls/mtls.go`) — `NewServerTLSConfig` (RequireAndVerifyClientCert, TLS 1.3 minimum), `NewClientTLSConfig` (RootCAs pool, TLS 1.3 minimum), `loadCertPool` (PEM CA file → `*x509.CertPool`), `IsEnabled` guard
+- **Config fields** — four new env vars: `WORKER_MTLS_ENABLED` (bool, default false), `WORKER_TLS_CA`, `WORKER_TLS_CERT`, `WORKER_TLS_KEY` (all default empty)
+- **Server mTLS listener** — when `WORKER_MTLS_ENABLED=true` and all cert paths are set, the server starts a second `*http.Server` on `:8443` with the mTLS `tls.Config`; uses `ListenAndServeTLS("","")` (certs embedded in `TLSConfig`); graceful shutdown included
+- **Worker mTLS client** — `-tls-ca`, `-tls-cert`, `-tls-key` CLI flags on `cmd/worker`; `buildHTTPClient()` returns a plain or mTLS-wrapped `*http.Client` depending on whether paths are set
+- **Unit tests** (`backend/pkg/mtls/mtls_test.go`) — 15 tests: `IsEnabled` (5 cases), `NewServerTLSConfig` valid/bad paths, `NewClientTLSConfig` valid/bad, `loadCertPool` valid/nonexistent/invalidPEM, TLS 1.3 minimum enforcement for both server and client; uses in-process ECDSA P-256 cert generation (no openssl required)
+
+### Changed
+- `Makefile` — added `test-e2e` target: `go test -tags=integration -timeout=120s ./backend/integration/...`
+- `Makefile` — updated `test` target description to reflect integration test separation
+- `docker-compose.observability.yml` — added Grafana provisioning volume mounts and `GF_PATHS_PROVISIONING` / `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` env vars
 
 ---
 

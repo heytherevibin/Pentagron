@@ -68,7 +68,7 @@ func (e *Executor) registerBuiltins() {
 			},
 			"required": ["command"]
 		}`),
-		AgentTypes: []string{"pentester", "coder", "recon"},
+		AgentTypes: []string{"pentester", "coder", "recon", "post_exploitation"},
 		Execute:    e.shellTool,
 	})
 
@@ -124,6 +124,35 @@ func (e *Executor) registerBuiltins() {
 		AgentTypes: []string{"pentester"},
 		Phases:     []string{"exploitation"},
 		Execute:    e.mcpTool("metasploit", "msf_exploit"),
+	})
+
+	// ── MCP — Metasploit session management ─────────────────────────────────
+	e.registry.Register(Tool{
+		Name:        "msf_sessions_list",
+		Description: "List all active Metasploit sessions (Meterpreter and shell).",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {}
+		}`),
+		AgentTypes: []string{"pentester", "post_exploitation"},
+		Phases:     []string{"exploitation", "post_exploitation"},
+		Execute:    e.mcpTool("metasploit", "msf_sessions_list"),
+	})
+
+	e.registry.Register(Tool{
+		Name:        "msf_session_cmd",
+		Description: "Run a command in an active Metasploit session by session ID.",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"session_id": {"type": "integer", "description": "Metasploit session ID"},
+				"command":    {"type": "string", "description": "Command to run in the session"}
+			},
+			"required": ["session_id", "command"]
+		}`),
+		AgentTypes: []string{"pentester", "post_exploitation"},
+		Phases:     []string{"exploitation", "post_exploitation"},
+		Execute:    e.mcpTool("metasploit", "msf_session_cmd"),
 	})
 
 	// ── MCP — SQLMap ─────────────────────────────────────────────────────────

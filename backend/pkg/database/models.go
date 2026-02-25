@@ -156,6 +156,53 @@ type Setting struct {
 	UpdatedAt time.Time
 }
 
+// ── Worker nodes ─────────────────────────────────────────────────────────────
+
+// WorkerStatus represents the current liveness state of a worker node.
+type WorkerStatus string
+
+const (
+	WorkerStatusOnline  WorkerStatus = "online"
+	WorkerStatusOffline WorkerStatus = "offline"
+	WorkerStatusBusy    WorkerStatus = "busy"
+)
+
+// WorkerNode is a remote execution agent that polls for tasks and returns results.
+// Used in air-gapped deployments where the main server cannot reach target networks.
+type WorkerNode struct {
+	ID           string       `gorm:"primaryKey;not null" json:"id"`
+	Hostname     string       `gorm:"not null" json:"hostname"`
+	Capabilities string       `gorm:"type:jsonb;default:'[]'" json:"capabilities"` // ["naabu","nuclei",...]
+	Status       WorkerStatus `gorm:"default:online" json:"status"`
+	LastSeenAt   time.Time    `json:"last_seen_at"`
+	RegisteredAt time.Time    `json:"registered_at"`
+	UpdatedAt    time.Time    `json:"updated_at"`
+}
+
+// WorkerTaskStatus represents the lifecycle of a task assigned to a worker.
+type WorkerTaskStatus string
+
+const (
+	WorkerTaskPending   WorkerTaskStatus = "pending"
+	WorkerTaskDispatched WorkerTaskStatus = "dispatched"
+	WorkerTaskCompleted WorkerTaskStatus = "completed"
+	WorkerTaskFailed    WorkerTaskStatus = "failed"
+)
+
+// WorkerTask is a tool-execution unit queued for a specific worker node.
+type WorkerTask struct {
+	ID         uuid.UUID        `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	WorkerID   string           `gorm:"not null;index" json:"worker_id"`
+	ToolName   string           `gorm:"not null" json:"tool_name"`
+	Input      string           `gorm:"type:jsonb" json:"input"`
+	Output     string           `gorm:"type:text" json:"output"`
+	Status     WorkerTaskStatus `gorm:"default:pending" json:"status"`
+	Error      string           `gorm:"type:text" json:"error"`
+	CreatedAt  time.Time        `json:"created_at"`
+	UpdatedAt  time.Time        `json:"updated_at"`
+	Worker     *WorkerNode      `gorm:"foreignKey:WorkerID;references:ID" json:"worker,omitempty"`
+}
+
 // ── Approval requests ─────────────────────────────────────────────────────────
 
 type ApprovalStatus string

@@ -12,12 +12,13 @@ import (
 type AgentType string
 
 const (
-	AgentTypePentester    AgentType = "pentester"
-	AgentTypeCoder        AgentType = "coder"
-	AgentTypeRecon        AgentType = "recon"
-	AgentTypeReporter     AgentType = "reporter"
-	AgentTypeOrchestrator AgentType = "primary_agent"
-	AgentTypeSummarizer   AgentType = "summarizer"
+	AgentTypePentester     AgentType = "pentester"
+	AgentTypeCoder         AgentType = "coder"
+	AgentTypeRecon         AgentType = "recon"
+	AgentTypeReporter      AgentType = "reporter"
+	AgentTypeOrchestrator  AgentType = "primary_agent"
+	AgentTypeSummarizer    AgentType = "summarizer"
+	AgentTypePostExploit   AgentType = "post_exploitation"
 )
 
 // Phase represents the current operational phase of a flow.
@@ -97,7 +98,7 @@ func LoadPrompt(agentType AgentType, data PromptData) (string, error) {
 // Callers should use config values; this is a safe fallback.
 func ModelForAgent(agentType AgentType) string {
 	switch agentType {
-	case AgentTypeOrchestrator, AgentTypePentester:
+	case AgentTypeOrchestrator, AgentTypePentester, AgentTypePostExploit:
 		return "claude-opus-4-6"
 	case AgentTypeRecon, AgentTypeCoder:
 		return "claude-sonnet-4-6"

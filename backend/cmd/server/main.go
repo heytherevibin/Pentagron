@@ -23,6 +23,8 @@ import (
 	"github.com/pentagron/pentagron/pkg/llm"
 	"github.com/pentagron/pentagron/pkg/mcp"
 	"github.com/pentagron/pentagron/pkg/memory"
+	"github.com/pentagron/pentagron/pkg/mtls"
+	"github.com/pentagron/pentagron/pkg/telemetry"
 	"github.com/pentagron/pentagron/pkg/tools"
 	"github.com/pentagron/pentagron/pkg/ws"
 	"gorm.io/gorm"
@@ -95,9 +97,20 @@ func main() {
 		zap.Bool("vector", cfg.VectorStoreEnabled),
 	)
 
+	// ── Langfuse tracing ──────────────────────────────────────────────────────
+	langfuse := telemetry.NewLangfuse(
+		cfg.LangfuseEnabled,
+		cfg.LangfusePublicKey,
+		cfg.LangfuseSecretKey,
+		cfg.LangfuseBaseURL,
+	)
+	if cfg.LangfuseEnabled {
+		log.Info("Langfuse tracing enabled", zap.String("url", cfg.LangfuseBaseURL))
+	}
+
 	// ── LLM providers ─────────────────────────────────────────────────────────
 	log.Info("initialising LLM providers")
-	llmMgr := llm.NewManager(log)
+	llmMgr := llm.NewManager(log).WithTracer(langfuse)
 
 	if cfg.AnthropicAPIKey != "" {
 		llmMgr.Register(llm.NewAnthropic(cfg.AnthropicAPIKey, cfg.AnthropicBaseURL))
@@ -186,13 +199,56 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	// Start in background
+	// Start plain HTTP server in background
 	go func() {
 		log.Info("HTTP server listening", zap.String("addr", srv.Addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("server error", zap.Error(err))
 		}
 	}()
+
+	// ── mTLS listener for worker nodes ────────────────────────────────────────
+	// When WORKER_MTLS_ENABLED=true, start a second TLS listener on :8443 (or
+	// WORKER_MTLS_PORT) that requires client certificates from worker nodes.
+	// Workers connect to this port instead of the plain HTTP port.
+	var mtlsSrv *http.Server
+	if cfg.WorkerMTLSEnabled && mtls.IsEnabled(cfg.WorkerTLSCACert, cfg.WorkerTLSCert, cfg.WorkerTLSKey) {
+		tlsCfg, tlsErr := mtls.NewServerTLSConfig(mtls.Config{
+			CACertPath: cfg.WorkerTLSCACert,
+			CertPath:   cfg.WorkerTLSCert,
+			KeyPath:    cfg.WorkerTLSKey,
+		})
+		if tlsErr != nil {
+			log.Fatal("worker mTLS config failed", zap.Error(tlsErr))
+		}
+
+		mtlsAddr := fmt.Sprintf("%s:8443", cfg.ServerHost)
+		mtlsSrv = &http.Server{
+			Addr:         mtlsAddr,
+			Handler:      router, // same router — worker routes are part of it
+			TLSConfig:    tlsCfg,
+			ReadTimeout:  30 * time.Second,
+			WriteTimeout: 60 * time.Second,
+			IdleTimeout:  120 * time.Second,
+		}
+		go func() {
+			log.Info("mTLS worker listener active",
+				zap.String("addr", mtlsAddr),
+				zap.String("ca", cfg.WorkerTLSCACert),
+			)
+			// ListenAndServeTLS with empty cert/key paths — the cert is already
+			// embedded in srv.TLSConfig, so pass empty strings here.
+			if err := mtlsSrv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+				log.Error("mTLS server error", zap.Error(err))
+			}
+		}()
+	} else if cfg.WorkerMTLSEnabled {
+		log.Warn("WORKER_MTLS_ENABLED=true but cert/key paths are incomplete — mTLS disabled",
+			zap.String("ca", cfg.WorkerTLSCACert),
+			zap.String("cert", cfg.WorkerTLSCert),
+			zap.String("key", cfg.WorkerTLSKey),
+		)
+	}
 
 	// ── Graceful shutdown ─────────────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)
@@ -206,6 +262,14 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Error("shutdown error", zap.Error(err))
 	}
+	if mtlsSrv != nil {
+		if err := mtlsSrv.Shutdown(ctx); err != nil {
+			log.Error("mTLS server shutdown error", zap.Error(err))
+		}
+	}
+
+	// Flush any buffered Langfuse events before exit
+	langfuse.Flush(ctx)
 
 	if neo4jClient != nil {
 		_ = neo4jClient.Close(ctx)

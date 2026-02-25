@@ -11,7 +11,7 @@ var PhaseAgent = map[string]agent.AgentType{
 	"recon":            agent.AgentTypeRecon,
 	"analysis":         agent.AgentTypePentester,
 	"exploitation":     agent.AgentTypePentester,
-	"post_exploitation": agent.AgentTypePentester,
+	"post_exploitation": agent.AgentTypePostExploit,
 	"reporting":        agent.AgentTypeReporter,
 	"cleanup":          agent.AgentTypeRecon,
 }

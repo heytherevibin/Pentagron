@@ -100,6 +100,14 @@ type Config struct {
 	LangfusePublicKey string `mapstructure:"LANGFUSE_PUBLIC_KEY"`
 	LangfuseSecretKey string `mapstructure:"LANGFUSE_SECRET_KEY"`
 	LangfuseBaseURL   string `mapstructure:"LANGFUSE_BASE_URL"`
+
+	// Worker mutual TLS
+	// When all three paths are set AND WorkerMTLSEnabled is true, the server
+	// requires worker nodes to authenticate via client certificates.
+	WorkerMTLSEnabled bool   `mapstructure:"WORKER_MTLS_ENABLED"`
+	WorkerTLSCACert   string `mapstructure:"WORKER_TLS_CA"`   // path to shared CA cert PEM
+	WorkerTLSCert     string `mapstructure:"WORKER_TLS_CERT"` // path to server cert PEM
+	WorkerTLSKey      string `mapstructure:"WORKER_TLS_KEY"`  // path to server key PEM
 }
 
 // Load reads configuration from environment variables (and .env file if present).
@@ -162,6 +170,10 @@ func Load() (*Config, error) {
 		v.SetDefault("AGENT_MODEL_CODER", "claude-sonnet-4-6")
 		v.SetDefault("AGENT_MODEL_REPORTER", "claude-haiku-4-5-20251001")
 		v.SetDefault("AGENT_MODEL_SUMMARIZER", "claude-haiku-4-5-20251001")
+		v.SetDefault("WORKER_MTLS_ENABLED", false)
+		v.SetDefault("WORKER_TLS_CA", "")
+		v.SetDefault("WORKER_TLS_CERT", "")
+		v.SetDefault("WORKER_TLS_KEY", "")
 
 		cfg := &Config{}
 		if err := v.Unmarshal(cfg); err != nil {

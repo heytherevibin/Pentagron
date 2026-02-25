@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: Pentagron-PostgreSQL
+    type: postgres
+    url: postgres:5432
+    database: ${POSTGRES_DB:-pentagron}
+    user: ${POSTGRES_USER:-pentagron}
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD:-pentagron}
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1600
+      timescaledb: false
+    isDefault: true
+    editable: true

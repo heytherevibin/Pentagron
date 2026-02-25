@@ -15,7 +15,31 @@
       "Bash(python3 -c \"from PIL import Image; print\\(''pillow ok''\\)\")",
       "Bash(python -c \"from PIL import Image; print\\(''pillow ok''\\)\")",
       "Bash(python -c \":*)",
-      "Bash(/Users/heytherevibin/Downloads/code/Pentagron/backend/pkg/api/handlers/deps.go:*)"
+      "Bash(/Users/heytherevibin/Downloads/code/Pentagron/backend/pkg/api/handlers/deps.go:*)",
+      "Bash(xargs grep -l \"approval_requests.*INSERT\\\\|INSERT.*approval_requests\")",
+      "Bash(find /c/Users/MATHEV03/Downloads/Code/pegatron/backend -type f -name \"*.go\" -exec grep -l \"langfuse\\\\|tracing\\\\|observability\" {} ;)",
+      "Bash(go get github.com/jung-kurt/gofpdf@latest)",
+      "Bash(go build ./pkg/api/handlers/...)",
+      "Bash(go build ./...)",
+      "Bash(go get gorm.io/driver/sqlite@latest)",
+      "Bash(go get modernc.org/sqlite@latest)",
+      "Bash(go list -m all)",
+      "Bash(go get github.com/glebarez/sqlite@latest)",
+      "Bash(go test ./pkg/api/handlers/... -v -count=1)",
+      "Bash(go doc modernc.org/sqlite)",
+      "Bash(go doc modernc.org/sqlite.MustRegisterDeterministicScalarFunction)",
+      "Bash(go doc modernc.org/sqlite.RegisterDeterministicScalarFunction)",
+      "Bash(go vet ./pkg/api/handlers/...)",
+      "Bash(go test -run TestHealth ./pkg/api/handlers/... -v -count=1)",
+      "Bash(go test ./pkg/api/handlers/... -count=1)",
+      "Bash(go test ./pkg/llm/... -count=1 -timeout=30s)",
+      "Bash(go test ./pkg/agent/... -count=1 -timeout=30s)",
+      "Bash(go test ./pkg/telemetry/... -count=1 -timeout=30s)",
+      "Bash(go test ./pkg/... -count=1 -timeout=60s)",
+      "Bash(go build -tags=integration ./...)",
+      "Bash(go build -tags=integration ./backend/integration/...)",
+      "Bash(go vet -tags=integration ./integration/...)",
+      "Bash(go test ./pkg/mtls/... -count=1 -timeout=30s -v)"
     ]
   }
 }

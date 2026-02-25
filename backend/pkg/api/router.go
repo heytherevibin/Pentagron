@@ -99,6 +99,11 @@ func Setup(deps *handlers.Deps, hub *ws.Hub, corsOrigin string, log *zap.Logger)
 		admin.DELETE("/users/:user_id", handlers.DeactivateUser(deps))
 		admin.POST("/users/:user_id/reset-password", handlers.ResetPassword(deps))
 
+		// Workers
+		api.POST("/workers/register", handlers.RegisterWorker(deps))
+		api.GET("/workers/:worker_id/tasks", handlers.PollWorkerTasks(deps))
+		api.POST("/workers/:worker_id/results", handlers.SubmitWorkerResult(deps))
+
 		// Activity
 		api.GET("/activity", handlers.GetActivity(deps))
 
