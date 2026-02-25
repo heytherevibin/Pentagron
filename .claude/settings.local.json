@@ -39,7 +39,18 @@
       "Bash(go build -tags=integration ./...)",
       "Bash(go build -tags=integration ./backend/integration/...)",
       "Bash(go vet -tags=integration ./integration/...)",
-      "Bash(go test ./pkg/mtls/... -count=1 -timeout=30s -v)"
+      "Bash(go test ./pkg/mtls/... -count=1 -timeout=30s -v)",
+      "Bash(gh run list --limit 5)",
+      "Bash(curl -s -H \"Accept: application/vnd.github+json\" \"https://api.github.com/repos/heytherevibin/Pentagron/actions/runs?per_page=3\")",
+      "Bash(python3 -c \"import sys,json; runs=json.load\\(sys.stdin\\).get\\(''workflow_runs'',[]\\); [print\\(r[''name''], r[''status''], r[''conclusion''], r[''html_url'']\\) for r in runs]\")",
+      "WebFetch(domain:api.github.com)",
+      "Bash(go vet ./...)",
+      "Bash(go test -count=1 -timeout=60s ./...)",
+      "Bash(git add .github/workflows/ci.yml)",
+      "Bash(git commit:*)",
+      "Bash(git push origin main)",
+      "Bash(winget install --id GitHub.cli --silent)",
+      "Bash(winget source reset --force)"
     ]
   }
 }
