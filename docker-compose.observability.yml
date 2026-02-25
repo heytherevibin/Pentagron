@@ -1,5 +1,3 @@
-version: "3.9"
-
 # Optional observability stack
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.observability.yml up
 
