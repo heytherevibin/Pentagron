@@ -45,6 +45,7 @@ func NewPostgres(dsn string, logLevel string) (*gorm.DB, error) {
 		&Session{},
 		&MemoryRecord{},
 		&ApprovalRequest{},
+		&Setting{},
 	); err != nil {
 		return nil, fmt.Errorf("auto-migrate: %w", err)
 	}

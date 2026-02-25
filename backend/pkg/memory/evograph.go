@@ -65,6 +65,11 @@ func NewEvoGraph(driver neo4j.DriverWithContext, log *zap.Logger) *EvoGraph {
 	}
 }
 
+// Neo4jDriver returns the underlying Neo4j driver for direct queries.
+func (e *EvoGraph) Neo4jDriver() neo4j.DriverWithContext {
+	return e.neo4j
+}
+
 // StartChain creates the root AttackChain node in Neo4j and in-memory.
 func (e *EvoGraph) StartChain(ctx context.Context, sessionID, projectID, objective string) string {
 	chainID := uuid.New().String()

@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 )
@@ -30,6 +31,24 @@ const (
 	PhaseReport       Phase = "report"
 )
 
+// String implements the interface required by tools.Registry.ToolDefinitions.
+func (a AgentType) String() string { return string(a) }
+
+// StepEvent is emitted by ReActAgent for each significant loop event.
+// Consumers set via WithEventSink receive these to stream agent activity.
+type StepEvent struct {
+	Type      string          // "thought" | "tool_call" | "tool_result" | "final_answer"
+	Thought   string
+	ToolName  string
+	ToolInput json.RawMessage
+	Output    string
+	Success   bool
+	Iteration int
+}
+
+// EventSink is an optional callback injected into ReActAgent for streaming events.
+type EventSink func(event StepEvent)
+
 // AttackPath is the classified attack strategy.
 type AttackPath string
 
@@ -49,7 +68,7 @@ type PromptData struct {
 	Guidelines  string
 }
 
-//go:embed ../../templates/prompts/*.tmpl
+//go:embed prompts/*.tmpl
 var promptFS embed.FS
 
 var promptCache = map[AgentType]*template.Template{}
@@ -58,7 +77,7 @@ var promptCache = map[AgentType]*template.Template{}
 func LoadPrompt(agentType AgentType, data PromptData) (string, error) {
 	tmpl, ok := promptCache[agentType]
 	if !ok {
-		path := fmt.Sprintf("../../templates/prompts/%s.tmpl", string(agentType))
+		path := fmt.Sprintf("prompts/%s.tmpl", string(agentType))
 		t, err := template.ParseFS(promptFS, path)
 		if err != nil {
 			return "", fmt.Errorf("parse prompt template %s: %w", agentType, err)

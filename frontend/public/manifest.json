@@ -1,0 +1,25 @@
+{
+  "name": "PENTAGRON // Mission Control",
+  "short_name": "PENTAGRON",
+  "description": "AI-Powered Autonomous Penetration Testing Framework",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0a0e1a",
+  "background_color": "#0a0e1a",
+  "categories": ["security", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

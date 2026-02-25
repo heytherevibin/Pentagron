@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://golang.org)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org)
 [![Docker](https://img.shields.io/badge/Docker-required-2496ED?logo=docker)](https://docker.com)
 [![Neo4j](https://img.shields.io/badge/Neo4j-5-008CC1?logo=neo4j)](https://neo4j.com)
 [![GitHub Issues](https://img.shields.io/github/issues/heytherevibin/Pentagron)](https://github.com/heytherevibin/Pentagron/issues)
@@ -132,7 +132,7 @@ Manual penetration testing is slow, inconsistent, and does not scale. Experience
 | **Tool Execution** | MCP + Docker exec | Structured tool I/O + arbitrary Kali toolkit access |
 | **Intelligence Graph** | Neo4j 5 | EvoGraph chains, recon graph, cross-session memory |
 | **Vector Memory** | PostgreSQL + pgvector | 4-class semantic similarity search |
-| **Frontend** | Next.js 16 + TypeScript | Real-time dashboard, graph visualisation, approval UI |
+| **Frontend** | Next.js 15 + TypeScript | Real-time dashboard, graph visualisation, approval UI |
 
 ---
 
@@ -170,7 +170,7 @@ The orchestrator classifies each objective into one of three attack paths at ses
 | Graph database | Neo4j | 5 |
 | Vector database | PostgreSQL + pgvector | 16 |
 | Cache | Redis | 7 |
-| Frontend | Next.js + TypeScript | 16 |
+| Frontend | Next.js + TypeScript | 15 |
 | Styling | Tailwind CSS | 3.4 |
 | WebSocket | gorilla/websocket | 1.5 |
 | Configuration | Viper | 1.19 |
@@ -361,6 +361,29 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | `POST` | `/api/flows/:id/approve` | Approve phase transition |
 | `POST` | `/api/flows/:id/reject` | Reject phase transition |
 
+### Settings
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/settings/general` | Get general configuration |
+| `PUT` | `/api/settings/general` | Update general configuration |
+| `GET` | `/api/settings/llm` | Get LLM provider configs (masked keys) |
+| `PUT` | `/api/settings/llm` | Update LLM provider configs |
+| `POST` | `/api/settings/llm/test` | Test LLM provider connectivity |
+| `GET` | `/api/settings/mcp` | Get MCP server configs |
+| `PUT` | `/api/settings/mcp` | Update MCP server configs |
+| `POST` | `/api/settings/mcp/test` | Test MCP server connectivity |
+
+### Users (Admin Only)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/users` | List all users |
+| `POST` | `/api/users` | Create user `{email, password, role}` |
+| `PUT` | `/api/users/:user_id` | Update user role |
+| `DELETE` | `/api/users/:user_id` | Deactivate user |
+| `POST` | `/api/users/:user_id/reset-password` | Reset user password |
+
 ### System
 
 | Method | Endpoint | Description |
@@ -369,8 +392,8 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | `GET` | `/api/models` | All available LLM models |
 | `GET` | `/api/health/providers` | LLM provider health |
 | `GET` | `/api/health/mcp` | MCP server health |
-| `GET` | `/api/settings` | Current settings |
-| `PUT` | `/api/settings` | Update settings |
+| `GET` | `/api/health/all` | Aggregate health (LLM + MCP + DB + Docker) |
+| `GET` | `/api/activity` | Recent activity feed |
 
 ### WebSocket Endpoints
 
@@ -504,13 +527,27 @@ pentagron/
 │       ├── tools/                   # Tool registry + executor (MCP + shell)
 │       └── ws/                      # WebSocket hub — broadcast + guidance injection
 │
-├── frontend/                        # Next.js 16 + TypeScript
+├── frontend/                        # Next.js 15 + TypeScript
 │   ├── src/
-│   │   ├── app/                     # App Router pages
-│   │   ├── components/              # UI component library
-│   │   ├── hooks/                   # useAgentWebSocket, useFlowStatus
-│   │   ├── lib/api.ts               # Typed Axios API client
+│   │   ├── app/
+│   │   │   ├── login/               # Public login page
+│   │   │   ├── setup/               # First-run setup wizard
+│   │   │   └── (authenticated)/     # Protected route group
+│   │   │       ├── layout.tsx       # TopNav + CommandPalette wrapper
+│   │   │       ├── page.tsx         # Dashboard (stats + projects + activity)
+│   │   │       ├── projects/new/    # Create project
+│   │   │       ├── projects/[id]/   # Project detail + flows
+│   │   │       ├── flows/[id]/      # Flow mission control (3-panel)
+│   │   │       └── settings/        # Admin panel (6 tabs)
+│   │   ├── components/              # 17 UI primitives + 3 composites
+│   │   ├── hooks/                   # useAgentWebSocket
+│   │   ├── lib/api.ts               # Typed Axios client with JWT interceptors
 │   │   └── types/index.ts           # Shared domain types
+│   ├── public/
+│   │   ├── manifest.json            # PWA manifest
+│   │   ├── sw.js                    # Service worker
+│   │   └── icons/                   # PWA icons (SVG)
+│   ├── middleware.ts                 # Cookie-based auth route protection
 │   └── Dockerfile
 │
 ├── mcp-servers/                     # Go MCP server binaries

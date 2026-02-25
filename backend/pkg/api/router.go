@@ -60,6 +60,7 @@ func Setup(deps *handlers.Deps, hub *ws.Hub, corsOrigin string, log *zap.Logger)
 		api.POST("/projects/:id/flows", handlers.CreateFlow(deps))
 		api.GET("/flows/:id", handlers.GetFlow(deps))
 		api.DELETE("/flows/:id", handlers.DeleteFlow(deps))
+		api.POST("/flows/:id/start", handlers.StartFlow(deps))
 		api.POST("/flows/:id/cancel", handlers.CancelFlow(deps))
 
 		// Approvals
@@ -67,16 +68,44 @@ func Setup(deps *handlers.Deps, hub *ws.Hub, corsOrigin string, log *zap.Logger)
 		api.POST("/flows/:id/approve", handlers.ApprovePhase(deps))
 		api.POST("/flows/:id/reject", handlers.RejectPhase(deps))
 
+		// EvoGraph
+		api.GET("/flows/:id/graph", handlers.GetFlowGraph(deps))
+
+		// Reports
+		api.GET("/flows/:id/report", handlers.ExportFlowReport(deps))
+
 		// Models
 		api.GET("/models", handlers.ListModels(deps))
 
-		// Settings
-		api.GET("/settings", handlers.GetSettings(deps))
-		api.PUT("/settings", handlers.UpdateSettings(deps))
+		// Settings — General
+		api.GET("/settings/general", handlers.GetGeneralSettings(deps))
+		api.PUT("/settings/general", handlers.UpdateGeneralSettings(deps))
+
+		// Settings — LLM
+		api.GET("/settings/llm", handlers.GetLLMSettings(deps))
+		api.PUT("/settings/llm", handlers.UpdateLLMSettings(deps))
+		api.POST("/settings/llm/test", handlers.TestLLMProvider(deps))
+
+		// Settings — MCP
+		api.GET("/settings/mcp", handlers.GetMCPSettings(deps))
+		api.PUT("/settings/mcp", handlers.UpdateMCPSettings(deps))
+		api.POST("/settings/mcp/test", handlers.TestMCPServer(deps))
+
+		// Users (admin only)
+		admin := api.Group("", middleware.RequireAdmin())
+		admin.GET("/users", handlers.ListUsers(deps))
+		admin.POST("/users", handlers.CreateUser(deps))
+		admin.PUT("/users/:user_id", handlers.UpdateUser(deps))
+		admin.DELETE("/users/:user_id", handlers.DeactivateUser(deps))
+		admin.POST("/users/:user_id/reset-password", handlers.ResetPassword(deps))
+
+		// Activity
+		api.GET("/activity", handlers.GetActivity(deps))
 
 		// Health checks
 		api.GET("/health/providers", handlers.ProviderHealth(deps))
 		api.GET("/health/mcp", handlers.MCPHealth(deps))
+		api.GET("/health/all", handlers.GetHealthAll(deps))
 	}
 
 	// ── WebSocket ─────────────────────────────────────────────────────────────

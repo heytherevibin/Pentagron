@@ -2,51 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #0a0e1a;
-  --surface: #111827;
-  --border: #1f2937;
-  --primary: #00ff88;
-  --danger: #ff4444;
-  --warning: #ffaa00;
+@layer base {
+  :root {
+    --mc-bg: #0a0e1a;
+    --mc-surface: #111827;
+    --mc-border: #1e293b;
+    --mc-emerald: #10b981;
+    --mc-crimson: #dc2626;
+    --mc-amber: #d97706;
+  }
+
+  * { box-sizing: border-box; }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--mc-bg);
+    color: #e2e8f0;
+    font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(circle, #1e293b 1px, transparent 1px);
+    background-size: 24px 24px;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  body > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 0; }
+  ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+  ::selection { background: #10b98133; color: #e2e8f0; }
+
+  input, textarea, select {
+    font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  }
+
+  input:focus, textarea:focus, select:focus, button:focus-visible {
+    outline: 1px solid #10b981;
+    outline-offset: -1px;
+  }
 }
 
-* {
-  box-sizing: border-box;
+@layer components {
+  .data-label {
+    @apply text-xxs font-mono font-medium uppercase tracking-widest-plus text-mc-text-muted;
+  }
+
+  .severity-critical { @apply bg-red-950/60 text-red-400 border border-red-800/60; }
+  .severity-high     { @apply bg-orange-950/60 text-orange-400 border border-orange-800/60; }
+  .severity-medium   { @apply bg-yellow-950/60 text-yellow-400 border border-yellow-800/60; }
+  .severity-low      { @apply bg-blue-950/60 text-blue-400 border border-blue-800/60; }
+  .severity-info     { @apply bg-slate-800/60 text-slate-400 border border-slate-700/60; }
 }
 
-body {
-  background-color: var(--bg);
-  color: #f1f5f9;
-  font-family: 'Inter', system-ui, sans-serif;
-}
-
-/* Terminal-style scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--surface);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-
-/* Severity badges */
-.severity-critical { @apply bg-red-900 text-red-200 border border-red-700; }
-.severity-high     { @apply bg-orange-900 text-orange-200 border border-orange-700; }
-.severity-medium   { @apply bg-yellow-900 text-yellow-200 border border-yellow-700; }
-.severity-low      { @apply bg-blue-900 text-blue-200 border border-blue-700; }
-.severity-info     { @apply bg-gray-800 text-gray-300 border border-gray-600; }
-
-/* Active attack chain pulse */
-.chain-active {
-  animation: pulse-orange 2s ease-in-out infinite;
-}
-
-@keyframes pulse-orange {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(251, 146, 60, 0); }
+@layer utilities {
+  .glow-emerald { box-shadow: 0 0 6px 1px #10b98144, 0 0 2px 0 #10b98188; }
+  .glow-crimson { box-shadow: 0 0 6px 1px #dc262644, 0 0 2px 0 #dc262688; }
+  .glow-amber   { box-shadow: 0 0 6px 1px #d9770644, 0 0 2px 0 #d9770688; }
+  .glow-blue    { box-shadow: 0 0 6px 1px #3b82f644, 0 0 2px 0 #3b82f688; }
 }

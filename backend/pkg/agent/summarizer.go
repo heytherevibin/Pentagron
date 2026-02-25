@@ -89,7 +89,6 @@ func (s *Summarizer) summarize(ctx context.Context, msgs []llm.Message, model, p
 
 	req := llm.ChatRequest{
 		Model:    model,
-		Provider: provider,
 		Messages: []llm.Message{
 			{
 				Role: llm.RoleUser,

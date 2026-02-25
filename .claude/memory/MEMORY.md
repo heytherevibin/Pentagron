@@ -2,14 +2,14 @@
 
 ## Project Overview
 - **Name**: Pentagron — Fully Automated AI Penetration Testing Framework
-- **Root**: `c:\Users\MATHEV03\Downloads\Code\pegatron`
+- **Root**: `/Users/heytherevibin/Downloads/code/Pentagron`
 - **GitHub**: https://github.com/heytherevibin/Pentagron
-- **Status**: Full scaffold complete (Phase 1 done), git initialized
+- **Status**: Phase 3 complete — backend, frontend (Mission Control UI), and security hardening all done
 - **Architecture**: Hybrid autonomous pentesting platform — ReAct agent + EvoGraph + MCP tools
 
 ## Tech Stack
 - **Backend**: Go 1.23, Gin, GORM, module `github.com/pentagron/pentagron`
-- **Frontend**: Next.js 16, TypeScript, Tailwind CSS
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS (JetBrains Mono, mc-* palette)
 - **Graph DB**: Neo4j 5 (EvoGraph + recon graph)
 - **Vector DB**: PostgreSQL 16 + pgvector
 - **Cache**: Redis 7
@@ -23,66 +23,51 @@
 - **EvoGraph**: dual-recording (in-memory + Neo4j), 5 node types
 - **Tool execution**: MCP → Docker exec fallback for all Kali tools
 - **Phase-gated approvals**: mandatory before exploitation phase
+- **Anthropic SDK**: v0.2.0-alpha.13 — uses `anthropic.F(value)` param.Field[T] pattern
+- **OpenAI SDK**: v0.1.0-alpha.62 — uses `openai.F(value)` param.Field[T] pattern
+- **Mission Control UI**: JetBrains Mono, mc-* colour palette, dot-grid background, 2px sharp corners
+- **Auth**: Dual token storage (localStorage + cookie), Next.js middleware for route protection
+- **Settings**: Granular endpoints (general, llm, mcp) with live persistence to `settings` table
+- **Authorization**: Project ownership checks + flow-level access via parent project JOIN
 
-## Agent Tiers
-| Tier | Model | Agents |
-|------|-------|--------|
-| 1 (Heavy) | claude-opus-4-6 | Orchestrator, Pentester |
-| 2 (Balanced) | claude-sonnet-4-6 | Recon, Coder |
-| 3 (Fast) | claude-haiku-4-5 | Reporter, Summarizer |
+## Frontend Route Structure
+```
+app/
+  login/page.tsx              ← Public auth
+  setup/page.tsx              ← First-run wizard
+  (authenticated)/
+    layout.tsx                ← TopNav + CommandPalette + notification prompt
+    page.tsx                  ← Dashboard (stats, projects, activity)
+    projects/new/page.tsx     ← Create project
+    projects/[id]/page.tsx    ← Project detail + flows
+    flows/[id]/page.tsx       ← Flow mission control (3-panel)
+    settings/page.tsx         ← Admin panel (6 tabs)
+```
 
 ## Critical File Paths
-- `backend/pkg/llm/provider.go` — LLMProvider interface
-- `backend/pkg/llm/manager.go` — multi-provider manager with fallback
-- `backend/pkg/agent/react.go` — ReAct loop
-- `backend/pkg/agent/reflector.go` — free-text drift detection
-- `backend/pkg/agent/summarizer.go` — context windowing (50KB/64KB limits)
-- `backend/pkg/memory/evograph.go` — EvoGraph (5 node types)
-- `backend/pkg/memory/vector.go` — pgvector 4-class store
-- `backend/pkg/tools/registry.go` — tool registration
-- `backend/pkg/tools/executor.go` — built-in tools wired up
-- `backend/pkg/mcp/client.go` — MCP HTTP/SSE client
 - `backend/pkg/api/router.go` — all Gin routes
-- `backend/cmd/server/main.go` — wires all dependencies
+- `backend/pkg/api/handlers/auth.go` — login, projects CRUD, ownership checks
+- `backend/pkg/api/handlers/flows.go` — flow CRUD, approvals, access control
+- `backend/pkg/api/handlers/settings.go` — settings CRUD, health, LLM/MCP testing
+- `backend/pkg/api/handlers/users.go` — user management (admin only)
+- `backend/pkg/api/handlers/activity.go` — activity feed
+- `backend/pkg/api/middleware/auth.go` — JWT auth + RequireAdmin middleware
+- `backend/pkg/database/models.go` — GORM models including Setting
+- `frontend/src/lib/api.ts` — typed Axios client with all endpoint helpers
+- `frontend/middleware.ts` — cookie-based route protection
 
-## Service Ports
-| Service | Port |
-|---------|------|
-| Backend | 8080 |
-| Frontend | 3000 |
-| MCP Naabu | 8000 |
-| MCP SQLMap | 8001 |
-| MCP Nuclei | 8002 |
-| MCP Metasploit | 8003 |
-| Neo4j Browser | 7474 |
-| Neo4j Bolt | 7687 |
-| PostgreSQL | 5432 |
-| Redis | 6379 |
-| Grafana | 3001 |
-| Langfuse | 4000 |
-
-## Scaffold Completeness
-All Phase 1 scaffolding tasks completed:
-1. ✅ Directory structure
-2. ✅ docker-compose.yml + dev + observability variants
-3. ✅ .env.example
-4. ✅ Makefile
-5. ✅ Go backend: config, database, llm, agent, memory, tools, mcp, docker, ws, api
-6. ✅ cmd/server/main.go + cmd/worker/main.go
-7. ✅ MCP servers: naabu, nuclei, metasploit, sqlmap
-8. ✅ docker/kali/Dockerfile + docker/postgres/init.sql
-9. ✅ Frontend: Next.js 16 scaffold
-10. ✅ backend/Dockerfile + frontend/Dockerfile
-11. ✅ README.md (enterprise grade)
-12. ✅ LICENSE (MIT + security notice)
-13. ✅ CHANGELOG.md
-14. ✅ .gitignore
-15. ✅ CLAUDE.md
+## Known Issues / Gotchas
+- Go embed cannot use `..` path traversal — prompts live in `backend/pkg/agent/prompts/`
+- React 19 types: `useRef<T>()` requires explicit arg; use `useRef<T | undefined>(undefined)`
+- EvoGraph API endpoint for graph data not yet implemented (flows/[id] shows empty graph stub)
+- D3 drag types need `as any` cast due to type incompatibility with force simulation
+- `useAgentWebSocket`: onMessage must be stored in ref to prevent reconnect loops
+- `user_projects` table not yet created — ListUsers gracefully handles missing table
 
 ## Next Steps
-- `go mod tidy` to resolve dependencies
-- Implement `flow/flow.go`, `flow/task.go`, `flow/provider.go`
-- Wire `recon/orchestrator.go` six-phase pipeline
-- Add frontend components: AgentChat, GraphVisualization, ApprovalDialogs
-- Add frontend pages: /login, /projects/[id], /flows/[id], /settings
-- Run `make up` to verify all containers boot
+1. `make env-setup && make up` — boot all containers and smoke test
+2. End-to-end test: login → project → flow → start → approve → complete
+3. Implement EvoGraph read API endpoint for graph visualization
+4. PDF report export (backend-generated)
+5. Grafana dashboard templates
+6. Langfuse tracing integration

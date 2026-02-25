@@ -22,7 +22,7 @@ func NewAnthropic(apiKey, baseURL string) *AnthropicProvider {
 		opts = append(opts, option.WithBaseURL(baseURL))
 	}
 	client := anthropic.NewClient(opts...)
-	return &AnthropicProvider{client: &client, baseURL: baseURL}
+	return &AnthropicProvider{client: client, baseURL: baseURL}
 }
 
 func (p *AnthropicProvider) Name() string { return "anthropic" }
@@ -89,7 +89,26 @@ func (p *AnthropicProvider) buildParams(req ChatRequest) anthropic.MessageNewPar
 		case RoleUser:
 			msgs = append(msgs, anthropic.NewUserMessage(anthropic.NewTextBlock(m.Content)))
 		case RoleAssistant:
-			msgs = append(msgs, anthropic.NewAssistantMessage(anthropic.NewTextBlock(m.Content)))
+			if len(m.ToolCalls) > 0 {
+				// Assistant message with tool use blocks
+				var blocks []anthropic.ContentBlockParamUnion
+				if m.Content != "" {
+					blocks = append(blocks, anthropic.NewTextBlock(m.Content))
+				}
+				for _, tc := range m.ToolCalls {
+					var input interface{}
+					_ = json.Unmarshal(tc.Input, &input)
+					blocks = append(blocks, anthropic.ToolUseBlockParam{
+						ID:    anthropic.F(tc.ID),
+						Name:  anthropic.F(tc.Name),
+						Input: anthropic.F(input),
+						Type:  anthropic.F(anthropic.ToolUseBlockParamTypeToolUse),
+					})
+				}
+				msgs = append(msgs, anthropic.NewAssistantMessage(blocks...))
+			} else {
+				msgs = append(msgs, anthropic.NewAssistantMessage(anthropic.NewTextBlock(m.Content)))
+			}
 		case RoleTool:
 			msgs = append(msgs, anthropic.NewUserMessage(
 				anthropic.NewToolResultBlock(m.ToolCallID, m.Content, false),
@@ -98,29 +117,27 @@ func (p *AnthropicProvider) buildParams(req ChatRequest) anthropic.MessageNewPar
 	}
 
 	// Convert tool definitions
-	var tools []anthropic.ToolUnionParam
+	var tools []anthropic.ToolUnionUnionParam
 	for _, t := range req.Tools {
 		tools = append(tools, anthropic.ToolParam{
-			Name:        t.Name,
-			Description: anthropic.String(t.Description),
-			InputSchema: anthropic.ToolInputSchemaParam{
-				Properties: t.InputSchema,
-			},
+			Name:        anthropic.F(t.Name),
+			Description: anthropic.F(t.Description),
+			InputSchema: anthropic.F[interface{}](json.RawMessage(t.InputSchema)),
 		})
 	}
 
 	params := anthropic.MessageNewParams{
-		Model:     anthropic.Model(req.Model),
-		MaxTokens: int64(maxTokens),
-		Messages:  msgs,
+		Model:     anthropic.F(anthropic.Model(req.Model)),
+		MaxTokens: anthropic.F(int64(maxTokens)),
+		Messages:  anthropic.F(msgs),
 	}
 	if req.SystemPrompt != "" {
-		params.System = []anthropic.TextBlockParam{
-			{Text: req.SystemPrompt},
-		}
+		params.System = anthropic.F([]anthropic.TextBlockParam{
+			anthropic.NewTextBlock(req.SystemPrompt),
+		})
 	}
 	if len(tools) > 0 {
-		params.Tools = tools
+		params.Tools = anthropic.F(tools)
 	}
 
 	return params

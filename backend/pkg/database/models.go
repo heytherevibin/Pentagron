@@ -148,6 +148,14 @@ type MemoryRecord struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// ── Settings ──────────────────────────────────────────────────────────────
+
+type Setting struct {
+	Key       string    `gorm:"primaryKey;not null"`
+	Value     string    `gorm:"type:text"`
+	UpdatedAt time.Time
+}
+
 // ── Approval requests ─────────────────────────────────────────────────────────
 
 type ApprovalStatus string

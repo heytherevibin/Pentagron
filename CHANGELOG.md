@@ -10,15 +10,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Flow orchestration engine (`pkg/flow/flow.go`, `task.go`, `provider.go`)
-- Six-phase recon pipeline (`pkg/recon/orchestrator.go`)
-- Frontend pages: `/login`, `/projects/[id]`, `/flows/[id]`, `/settings`
-- Frontend components: `AgentChat`, `GraphVisualization`, `ApprovalDialogs`, `AgentTimeline`
-- `go mod tidy` and dependency lock
 - End-to-end integration tests
 - Grafana dashboard templates
 - Langfuse tracing integration
 - Air-gapped worker node mutual TLS
+- EvoGraph read API endpoint for real-time graph visualization
+- PDF report export (backend-generated with Pentagron branding)
+
+---
+
+## [0.2.0] - 2026-02-25
+
+### Added
+
+#### Frontend — Mission Control UI Rebuild
+- **Design system**: JetBrains Mono font, `mc-*` colour palette (emerald primary, crimson danger), dot-grid background, 2px sharp corners, custom scrollbars
+- **PostCSS config**: Created `postcss.config.mjs` — fixes zero-style rendering
+- **Auth middleware**: `frontend/middleware.ts` — cookie-based route protection, redirect to `/login` with return URL
+- **Route groups**: `(authenticated)/` layout with TopNav + CommandPalette wrapper
+- **17 UI components**: GlowDot, DataLabel, Panel, StatusBadge, Button, Input, Textarea, TagInput, StatCard, PhaseProgress, TopNav, EmptyState, ConfirmDialog, CommandPalette, Skeleton, SlidePanel, FlowTicker
+- **Login page**: Centered card with system health check, dual token storage (localStorage + cookie), Suspense boundary for `useSearchParams`
+- **Setup wizard**: 3-step onboarding (API key → first project → first flow) at `/setup`
+- **Dashboard**: 4 StatCards, active engagements table, recent activity feed from `GET /api/activity`
+- **Create project page**: `/projects/new` with TagInput for scope validation
+- **Project detail page**: Project info panel + flows table with inline "new flow" form + ConfirmDialog for deletes
+- **Flow execution page**: 3-panel mission control (50% agent chat | 25% telemetry | 25% EvoGraph), phase progress bar, approval dialog
+- **Settings admin panel**: 6-tab layout (General, LLM, Agents, MCP, Users, Health) with live API persistence, masked API key inputs, connection testing, user management
+- **AgentChat**: Collapsible thoughts, tool calls with input/output toggle, emerald/crimson result accents, auto-scroll with floating button, connection GlowDot
+- **GraphVisualization**: D3 force-directed graph with SVG glow filters, colour-coded nodes by type, click navigation
+- **ApprovalDialog**: Amber-accented professional dialog with AUTHORIZE/DENY buttons and optional notes
+- **Command palette**: Cmd+K global search across projects, flows, pages, and quick actions
+- **Report export**: "EXPORT REPORT" button on completed/failed flows, client-side Markdown generation with download
+- **Browser notifications**: Permission prompt on first authenticated load, notification trigger for pending approvals when tab is hidden
+- **PWA support**: `manifest.json`, service worker (`sw.js`) with cache-first static + network-first API, SVG pentagon icons, offline shell
+
+#### Backend — New Endpoints
+- `GET /api/settings/general` + `PUT /api/settings/general` — runtime general config
+- `GET /api/settings/llm` + `PUT /api/settings/llm` — per-provider LLM config with masked keys
+- `POST /api/settings/llm/test` — test LLM provider connectivity with latency
+- `GET /api/settings/mcp` + `PUT /api/settings/mcp` — MCP server URL management
+- `POST /api/settings/mcp/test` — test MCP server connectivity
+- `GET /api/users` + `POST /api/users` — user listing and creation (admin only)
+- `PUT /api/users/:user_id` + `DELETE /api/users/:user_id` — user role update and deactivation
+- `POST /api/users/:user_id/reset-password` — admin password reset
+- `GET /api/activity` — recent activity feed (joins flows + projects)
+- `GET /api/health/all` — aggregate health (LLM + MCP + DB + Docker)
+- `Setting` database model with auto-migration and upsert persistence
+
+#### Backend — Security Hardening
+- **Project ownership checks**: `ListProjects` filters by `owner_id` for non-admin users; `GetProject`, `UpdateProject`, `DeleteProject` verify ownership via `isProjectOwnerOrAdmin()` helper
+- **Flow-level authorization**: `checkFlowAccess()` JOINs flows with projects to verify parent project ownership; applied to `GetFlow`, `DeleteFlow`, `StartFlow`, `CancelFlow`, `ListApprovals`, `ApprovePhase`, `RejectPhase`
+- **Admin middleware**: `RequireAdmin()` middleware protects user management endpoints (checks `user_role` from JWT context)
+- **DB health timeout**: `GetHealthAll` wraps DB ping in `context.WithTimeout(ctx, 5s)`
+
+### Changed
+- Replaced old `GET/PUT /api/settings` with granular settings endpoints
+- Removed 11 unused npm dependencies: `socket.io-client`, `@tanstack/react-query`, `lucide-react`, `recharts`, `zustand`, `date-fns`, `class-variance-authority`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-select`, `@radix-ui/react-tabs`, `@radix-ui/react-tooltip`
+- `useAgentWebSocket`: Fixed memory leak by storing `onMessage` callback in ref instead of dependency array
+- Fixed `GetFlow()` nil check: `map[string]interface{}` uses `len() == 0` not `== nil`
+- Fixed multiple handlers with missing error handling (`ListProjects`, `UpdateProject`, `DeleteFlow`, `CancelFlow`, `ApprovePhase`, `RejectPhase`)
+
+### Fixed
+- PostCSS configuration missing — Tailwind CSS now processes correctly
+- Login page `useSearchParams` Suspense boundary (Next.js 15 requirement)
+- TypeScript compilation: Extended `WSMessage` type with optional flattened fields, fixed component prop mismatches
+- D3 drag type mismatch in `GraphVisualization`
+- Router param mismatch: handlers now use `c.Param("user_id")` matching `:user_id` route
 
 ---
 
@@ -83,5 +140,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/heytherevibin/Pentagron/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/heytherevibin/Pentagron/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/heytherevibin/Pentagron/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/heytherevibin/Pentagron/releases/tag/v0.1.0

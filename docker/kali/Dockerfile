@@ -63,15 +63,18 @@ RUN apt-get install -y --no-install-recommends \
     wordlists \
     && apt-get clean
 
-# ── Go-based tools (installed via pre-built binaries) ─────────────────────────
-RUN apt-get install -y --no-install-recommends golang-go && \
-    go install github.com/projectdiscovery/httpx/cmd/httpx@latest && \
-    go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
-    go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
-    go install github.com/projectdiscovery/katana/cmd/katana@latest && \
-    go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
-    go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
-    cp /root/go/bin/* /usr/local/bin/ && \
+# ── ProjectDiscovery tools (pre-built release binaries, no CGO needed) ─────────
+RUN apt-get install -y --no-install-recommends unzip ca-certificates && \
+    ARCH=$(dpkg --print-architecture) && \
+    for tool in httpx nuclei naabu katana subfinder dnsx; do \
+        wget -qO /tmp/${tool}.zip \
+            "https://github.com/projectdiscovery/${tool}/releases/latest/download/${tool}_linux_${ARCH}.zip" \
+        && unzip -oq /tmp/${tool}.zip ${tool} -d /usr/local/bin/ \
+        && rm -f /tmp/${tool}.zip \
+        || echo "WARN: skipping ${tool} (download failed)"; \
+    done && \
+    chmod +x /usr/local/bin/httpx /usr/local/bin/nuclei /usr/local/bin/naabu \
+              /usr/local/bin/katana /usr/local/bin/subfinder /usr/local/bin/dnsx 2>/dev/null || true && \
     apt-get clean
 
 # ── Update Nuclei templates ───────────────────────────────────────────────────

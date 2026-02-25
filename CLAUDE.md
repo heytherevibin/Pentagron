@@ -7,7 +7,7 @@ and a suite of MCP-wrapped offensive security tools into a single deployable mon
 
 ## Stack
 - **Backend**: Go 1.23, Gin, GORM, module `github.com/pentagron/pentagron`
-- **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Graph DB**: Neo4j 5 (EvoGraph + recon graph)
 - **Vector DB**: PostgreSQL 16 + pgvector
 - **Cache/Queue**: Redis 7
@@ -83,10 +83,14 @@ Project-local Claude memory lives in `.claude/memory/MEMORY.md`.
 Architecture plans live in `.claude/plans/`.
 Update these files when you make significant architectural changes.
 
+## Current Status
+Phases 1-3 complete. Backend, frontend (Mission Control UI), and security hardening are all built. Both `go build ./...` and `npm run build` pass clean.
+
 ## Next Implementation Steps
-1. `go mod tidy` — resolve all dependencies
-2. Implement `flow/flow.go`, `flow/task.go`, `flow/provider.go` skeleton
-3. Wire `recon/orchestrator.go` six-phase pipeline
-4. Add frontend components: `AgentChat`, `GraphVisualization`, `ApprovalDialogs`
-5. Add frontend pages: `/login`, `/projects/[id]`, `/flows/[id]`, `/settings`
-6. Run `make up` to verify all containers boot cleanly
+1. `make env-setup && make up` — boot all containers and smoke test
+2. End-to-end integration test: login → project → flow → start → approve → complete
+3. Implement EvoGraph read API endpoint for real-time graph visualization
+4. PDF report export (backend-generated with Pentagron branding)
+5. Grafana dashboard templates for agent metrics
+6. Langfuse tracing integration
+7. Air-gapped worker node mutual TLS

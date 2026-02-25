@@ -64,8 +64,20 @@ func Logout(d *Deps) gin.HandlerFunc {
 
 func ListProjects(d *Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var projects []map[string]interface{}
-		d.DB.Raw("SELECT id, name, description, owner_id, created_at FROM projects WHERE deleted_at IS NULL ORDER BY created_at DESC").Scan(&projects)
+		userID, _ := c.Get("user_id")
+		role, _ := c.Get("user_role")
+
+		projects := make([]map[string]interface{}, 0)
+		var err error
+		if role == "admin" {
+			err = d.DB.Raw("SELECT id, name, description, owner_id, created_at FROM projects WHERE deleted_at IS NULL ORDER BY created_at DESC").Scan(&projects).Error
+		} else {
+			err = d.DB.Raw("SELECT id, name, description, owner_id, created_at FROM projects WHERE owner_id = ? AND deleted_at IS NULL ORDER BY created_at DESC", userID).Scan(&projects).Error
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, projects)
 	}
 }
@@ -82,9 +94,13 @@ func CreateProject(d *Deps) gin.HandlerFunc {
 			return
 		}
 		ownerID, _ := c.Get("user_id")
-		d.DB.Exec("INSERT INTO projects (id, name, description, owner_id, scope, created_at, updated_at) VALUES (gen_random_uuid(), ?, ?, ?, ?, NOW(), NOW())",
-			body.Name, body.Description, ownerID, body.Scope)
-		c.JSON(http.StatusCreated, gin.H{"message": "project created"})
+		var newID string
+		if err := d.DB.Raw("INSERT INTO projects (id, name, description, owner_id, scope, created_at, updated_at) VALUES (gen_random_uuid(), ?, ?, ?, ?, NOW(), NOW()) RETURNING id",
+			body.Name, body.Description, ownerID, body.Scope).Scan(&newID).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"id": newID, "message": "project created"})
 	}
 }
 
@@ -92,7 +108,18 @@ func GetProject(d *Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		var p map[string]interface{}
-		d.DB.Raw("SELECT * FROM projects WHERE id = ? AND deleted_at IS NULL", id).Scan(&p)
+		if err := d.DB.Raw("SELECT * FROM projects WHERE id = ? AND deleted_at IS NULL", id).Scan(&p).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if len(p) == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+			return
+		}
+		if !isProjectOwnerOrAdmin(c, p) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
+			return
+		}
 		c.JSON(http.StatusOK, p)
 	}
 }
@@ -100,8 +127,27 @@ func GetProject(d *Deps) gin.HandlerFunc {
 func UpdateProject(d *Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
+
+		// Check ownership
+		var p map[string]interface{}
+		if err := d.DB.Raw("SELECT id, owner_id FROM projects WHERE id = ? AND deleted_at IS NULL", id).Scan(&p).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if len(p) == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+			return
+		}
+		if !isProjectOwnerOrAdmin(c, p) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
+			return
+		}
+
 		var body map[string]interface{}
-		_ = c.ShouldBindJSON(&body)
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		d.DB.Exec("UPDATE projects SET updated_at = NOW() WHERE id = ?", id)
 		c.JSON(http.StatusOK, gin.H{"id": id})
 	}
@@ -110,24 +156,35 @@ func UpdateProject(d *Deps) gin.HandlerFunc {
 func DeleteProject(d *Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
+
+		// Check ownership
+		var p map[string]interface{}
+		if err := d.DB.Raw("SELECT id, owner_id FROM projects WHERE id = ? AND deleted_at IS NULL", id).Scan(&p).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if len(p) == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+			return
+		}
+		if !isProjectOwnerOrAdmin(c, p) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
+			return
+		}
+
 		d.DB.Exec("UPDATE projects SET deleted_at = NOW() WHERE id = ?", id)
 		c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 	}
 }
 
-func GetSettings(d *Deps) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"llm_default_provider": d.Config.LLMDefaultProvider,
-			"llm_default_model":    d.Config.LLMDefaultModel,
-			"agent_require_approval": d.Config.AgentRequireApproval,
-			"evograph_enabled":     d.Config.EvoGraphEnabled,
-		})
+// isProjectOwnerOrAdmin returns true if the requesting user owns the project or is an admin.
+func isProjectOwnerOrAdmin(c *gin.Context, project map[string]interface{}) bool {
+	role, _ := c.Get("user_role")
+	if role == "admin" {
+		return true
 	}
+	userID, _ := c.Get("user_id")
+	ownerID, _ := project["owner_id"]
+	return userID == ownerID
 }
 
-func UpdateSettings(d *Deps) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "settings updated (restart required for some changes)"})
-	}
-}

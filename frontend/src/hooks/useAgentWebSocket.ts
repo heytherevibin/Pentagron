@@ -25,7 +25,9 @@ export function useAgentWebSocket({
   const [messages, setMessages] = useState<WSMessage[]>([])
   const [connected, setConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimer = useRef<NodeJS.Timeout>()
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const onMessageRef = useRef(onMessage)
+  onMessageRef.current = onMessage
 
   const connect = useCallback(() => {
     const url = wsUrl(`/ws/agent/${sessionId}?flow_id=${flowId}`)
@@ -42,7 +44,7 @@ export function useAgentWebSocket({
         const msg: WSMessage = JSON.parse(event.data)
         if (msg.type === 'ping') return
         setMessages((prev) => [...prev, msg])
-        onMessage?.(msg)
+        onMessageRef.current?.(msg)
       } catch {
         // ignore malformed messages
       }
@@ -57,7 +59,7 @@ export function useAgentWebSocket({
     ws.onerror = () => {
       ws.close()
     }
-  }, [sessionId, flowId, onMessage])
+  }, [sessionId, flowId])
 
   useEffect(() => {
     connect()

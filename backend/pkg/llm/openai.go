@@ -7,6 +7,7 @@ import (
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/shared"
 )
 
 // OpenAIProvider implements Provider for OpenAI (and any OpenAI-compatible API).
@@ -24,7 +25,7 @@ func NewOpenAI(apiKey, baseURL, providerName string) *OpenAIProvider {
 		opts = append(opts, option.WithBaseURL(baseURL))
 	}
 	client := openai.NewClient(opts...)
-	return &OpenAIProvider{client: &client, providerName: providerName, baseURL: baseURL}
+	return &OpenAIProvider{client: client, providerName: providerName, baseURL: baseURL}
 }
 
 // NewOpenRouter creates an OpenRouter provider (OpenAI-compatible).
@@ -127,24 +128,27 @@ func (p *OpenAIProvider) buildParams(req ChatRequest) openai.ChatCompletionNewPa
 
 	var tools []openai.ChatCompletionToolParam
 	for _, t := range req.Tools {
-		var schema interface{}
+		var schema map[string]interface{}
 		_ = json.Unmarshal(t.InputSchema, &schema)
+		if schema == nil {
+			schema = map[string]interface{}{}
+		}
 		tools = append(tools, openai.ChatCompletionToolParam{
-			Function: openai.FunctionDefinitionParam{
-				Name:        t.Name,
-				Description: openai.String(t.Description),
-				Parameters:  openai.FunctionParameters(schema.(map[string]interface{})),
-			},
+			Function: openai.F(shared.FunctionDefinitionParam{
+				Name:        openai.F(t.Name),
+				Description: openai.F(t.Description),
+				Parameters:  openai.F(openai.FunctionParameters(schema)),
+			}),
 		})
 	}
 
 	params := openai.ChatCompletionNewParams{
-		Model:     openai.ChatModel(req.Model),
-		Messages:  msgs,
-		MaxTokens: openai.Int(int64(maxTokens)),
+		Model:     openai.F(openai.ChatModel(req.Model)),
+		Messages:  openai.F(msgs),
+		MaxTokens: openai.F(int64(maxTokens)),
 	}
 	if len(tools) > 0 {
-		params.Tools = tools
+		params.Tools = openai.F(tools)
 	}
 	return params
 }

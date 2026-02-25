@@ -50,21 +50,51 @@ export const flows = {
     api.post(`/api/projects/${projectId}/flows`, data),
   get: (id: string) => api.get(`/api/flows/${id}`),
   delete: (id: string) => api.delete(`/api/flows/${id}`),
+  start: (id: string) => api.post(`/api/flows/${id}/start`),
   cancel: (id: string) => api.post(`/api/flows/${id}/cancel`),
   listApprovals: (id: string) => api.get(`/api/flows/${id}/approvals`),
   approve: (flowId: string, approvalId: string, notes?: string) =>
     api.post(`/api/flows/${flowId}/approve`, { approval_id: approvalId, notes }),
   reject: (flowId: string, approvalId: string, notes?: string) =>
     api.post(`/api/flows/${flowId}/reject`, { approval_id: approvalId, notes }),
+  graph: (id: string) => api.get(`/api/flows/${id}/graph`),
+  report: (id: string, format: 'markdown' | 'json' = 'json') =>
+    api.get(`/api/flows/${id}/report`, { params: { format } }),
+  reportDownload: (id: string) =>
+    api.get(`/api/flows/${id}/report`, { responseType: 'blob' }),
 }
 
 export const models = {
   list: () => api.get('/api/models'),
 }
 
+export const settings = {
+  getGeneral: () => api.get('/api/settings/general'),
+  updateGeneral: (data: Record<string, unknown>) => api.put('/api/settings/general', data),
+  getLLM: () => api.get('/api/settings/llm'),
+  updateLLM: (data: Record<string, unknown>) => api.put('/api/settings/llm', data),
+  testLLM: (provider: string) => api.post('/api/settings/llm/test', { provider }),
+  getMCP: () => api.get('/api/settings/mcp'),
+  updateMCP: (data: Record<string, unknown>) => api.put('/api/settings/mcp', data),
+  testMCP: (server: string) => api.post('/api/settings/mcp/test', { server }),
+}
+
+export const users = {
+  list: () => api.get('/api/users'),
+  create: (data: { email: string; password: string; role: string }) => api.post('/api/users', data),
+  update: (id: string, data: { role: string }) => api.put(`/api/users/${id}`, data),
+  deactivate: (id: string) => api.delete(`/api/users/${id}`),
+  resetPassword: (id: string, password: string) => api.post(`/api/users/${id}/reset-password`, { password }),
+}
+
+export const activity = {
+  list: () => api.get('/api/activity'),
+}
+
 export const health = {
   providers: () => api.get('/api/health/providers'),
   mcp: () => api.get('/api/health/mcp'),
+  all: () => api.get('/api/health/all'),
 }
 
 // ── WebSocket URL builder ─────────────────────────────────────────────────────

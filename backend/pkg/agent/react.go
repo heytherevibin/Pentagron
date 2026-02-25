@@ -66,6 +66,7 @@ type ReActAgent struct {
 	reflector  *Reflector
 	summarizer *Summarizer
 	log        *zap.Logger
+	eventSink  EventSink // optional; set via WithEventSink for streaming
 
 	// Conversation state
 	messages []llm.Message
@@ -98,6 +99,20 @@ func NewReActAgent(
 		reflector:  NewReflector(log),
 		summarizer: NewSummarizer(llmMgr, log),
 		log:        log,
+	}
+}
+
+// WithEventSink attaches an optional event sink for streaming agent activity.
+// Must be called before Run.
+func (a *ReActAgent) WithEventSink(sink EventSink) *ReActAgent {
+	a.eventSink = sink
+	return a
+}
+
+// emitEvent sends a StepEvent to the registered sink if one is set.
+func (a *ReActAgent) emitEvent(e StepEvent) {
+	if a.eventSink != nil {
+		a.eventSink(e)
 	}
 }
 
@@ -165,6 +180,7 @@ func (a *ReActAgent) Run(ctx context.Context, task string) (*AgentResult, error)
 		step.Thought = resp.Content
 		if resp.Content != "" {
 			a.evograph.RecordStep(ctx, a.cfg.SessionID, resp.Content, i+1)
+			a.emitEvent(StepEvent{Type: "thought", Thought: resp.Content, Iteration: i + 1})
 		}
 
 		// Append assistant turn
@@ -182,9 +198,18 @@ func (a *ReActAgent) Run(ctx context.Context, task string) (*AgentResult, error)
 
 		// Execute all tool calls
 		for _, tc := range resp.ToolCalls {
+			a.emitEvent(StepEvent{Type: "tool_call", ToolName: tc.Name, ToolInput: tc.Input, Iteration: i + 1})
 			result := a.executeTool(ctx, tc)
 			step.ToolCalls = append(step.ToolCalls, tc)
 			step.ToolResults = append(step.ToolResults, result)
+
+			a.emitEvent(StepEvent{
+				Type:      "tool_result",
+				ToolName:  tc.Name,
+				Output:    result.Output,
+				Success:   result.Success,
+				Iteration: i + 1,
+			})
 
 			// Append tool result to conversation
 			a.messages = append(a.messages, llm.ToolResultMessage(tc.ID, result.Output))
@@ -201,6 +226,7 @@ func (a *ReActAgent) Run(ctx context.Context, task string) (*AgentResult, error)
 				var finishInput struct{ Answer string }
 				_ = json.Unmarshal(tc.Input, &finishInput)
 				finalAnswer = finishInput.Answer
+				a.emitEvent(StepEvent{Type: "final_answer", Output: finalAnswer, Iteration: i + 1})
 				goto done
 			}
 		}

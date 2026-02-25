@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0a0e1a"/>
+  <polygon points="256,40 460,195 382,430 130,430 52,195" fill="none" stroke="#10b981" stroke-width="10"/>
+  <text x="256" y="275" text-anchor="middle" fill="#10b981" font-family="monospace" font-size="64" font-weight="bold">PEN</text>
+</svg>

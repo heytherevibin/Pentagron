@@ -1,5 +1,5 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -ldflags="-s -w" -o /bin/pentagron-server ./cmd/server
 
 # ── Stage 2: Dev (with air for hot reload) ────────────────────────────────────
-FROM golang:1.23-alpine AS dev
+FROM golang:1.24-alpine AS dev
 
 WORKDIR /app
 RUN go install github.com/air-verse/air@latest
@@ -30,9 +30,8 @@ FROM alpine:3.20 AS production
 
 RUN apk add --no-cache ca-certificates wget tzdata
 
-# Copy binary and templates
+# Copy binary (templates are Go-embedded, no file copy needed)
 COPY --from=builder /bin/pentagron-server /usr/local/bin/pentagron-server
-COPY --from=builder /app/pkg/templates /app/pkg/templates
 
 WORKDIR /app
 EXPOSE 8080

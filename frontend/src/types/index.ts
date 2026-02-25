@@ -101,6 +101,12 @@ export interface WSMessage {
   flow_id: string
   payload: unknown
   timestamp: string
+  // Flattened fields commonly sent by the backend
+  content?: string
+  iteration?: number
+  toolName?: string
+  toolInput?: unknown
+  success?: boolean
 }
 
 // ── LLM / model types ─────────────────────────────────────────────────────────

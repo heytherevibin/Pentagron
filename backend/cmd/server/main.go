@@ -18,9 +18,14 @@ import (
 	"github.com/pentagron/pentagron/pkg/api/handlers"
 	"github.com/pentagron/pentagron/pkg/config"
 	"github.com/pentagron/pentagron/pkg/database"
+	"github.com/pentagron/pentagron/pkg/docker"
+	"github.com/pentagron/pentagron/pkg/flow"
 	"github.com/pentagron/pentagron/pkg/llm"
 	"github.com/pentagron/pentagron/pkg/mcp"
+	"github.com/pentagron/pentagron/pkg/memory"
+	"github.com/pentagron/pentagron/pkg/tools"
 	"github.com/pentagron/pentagron/pkg/ws"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -41,7 +46,16 @@ func main() {
 
 	// ── PostgreSQL ─────────────────────────────────────────────────────────────
 	log.Info("connecting to PostgreSQL")
-	db, err := database.NewPostgres(cfg.PostgresDSN, cfg.LogLevel)
+	// Viper may not resolve DSN from env unless explicitly bound; fall back to env or parts.
+	postgresDSN := cfg.PostgresDSN
+	if postgresDSN == "" {
+		postgresDSN = os.Getenv("POSTGRES_DSN")
+	}
+	if postgresDSN == "" {
+		postgresDSN = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+			cfg.PostgresUser, cfg.PostgresPassword, cfg.PostgresHost, cfg.PostgresPort, cfg.PostgresDB)
+	}
+	db, err := database.NewPostgres(postgresDSN, cfg.LogLevel)
 	if err != nil {
 		log.Fatal("postgres connection failed", zap.Error(err))
 	}
@@ -66,6 +80,20 @@ func main() {
 			}
 		}
 	}
+
+	// ── Memory (EvoGraph + VectorStore) ───────────────────────────────────────
+	var neo4jDriver interface{ Close(context.Context) error }
+	_ = neo4jDriver
+	var memMgr *memory.Manager
+	if neo4jClient != nil {
+		memMgr = memory.NewManager(db, neo4jClient.Driver(), log, cfg.VectorStoreEnabled, cfg.EvoGraphEnabled)
+	} else {
+		memMgr = memory.NewManager(db, nil, log, cfg.VectorStoreEnabled, false)
+	}
+	log.Info("memory manager initialised",
+		zap.Bool("evograph", cfg.EvoGraphEnabled && neo4jClient != nil),
+		zap.Bool("vector", cfg.VectorStoreEnabled),
+	)
 
 	// ── LLM providers ─────────────────────────────────────────────────────────
 	log.Info("initialising LLM providers")
@@ -115,16 +143,37 @@ func main() {
 		mcpMgr.DiscoverTools(ctx)
 	}()
 
+	// ── Docker + Tool registry ─────────────────────────────────────────────────
+	var dockerExec *docker.Executor
+	dockerClient, dockerErr := docker.NewClient(cfg.DockerSocket)
+	if dockerErr != nil {
+		log.Warn("docker unavailable — shell tool disabled", zap.Error(dockerErr))
+	} else {
+		dockerExec = docker.NewExecutor(dockerClient, cfg.KaliContainerName, log)
+		log.Info("docker executor initialised", zap.String("container", cfg.KaliContainerName))
+	}
+
+	toolsExecutor := tools.NewExecutor(mcpMgr, dockerExec, log)
+	log.Info("tool registry initialised", zap.Strings("tools", toolsExecutor.Registry().All()))
+
 	// ── WebSocket hub ─────────────────────────────────────────────────────────
 	hub := ws.NewHub(log)
 
+	// ── Flow engine ───────────────────────────────────────────────────────────
+	taskRunner := flow.NewTaskRunner(db, llmMgr, toolsExecutor.Registry(), memMgr, hub, cfg, log)
+	flowEngine := flow.NewFlowEngine(db, taskRunner, hub, log)
+	log.Info("flow engine initialised")
+
 	// ── HTTP router ───────────────────────────────────────────────────────────
 	deps := &handlers.Deps{
-		Config: cfg,
-		DB:     db,
-		LLMMgr: llmMgr,
-		MCPMgr: mcpMgr,
-		Log:    log,
+		Config:     cfg,
+		DB:         db,
+		LLMMgr:     llmMgr,
+		MCPMgr:     mcpMgr,
+		MemMgr:     memMgr,
+		Hub:        hub,
+		FlowEngine: flowEngine,
+		Log:        log,
 	}
 	router := api.Setup(deps, hub, cfg.CORSOrigin, log)
 
@@ -189,15 +238,14 @@ func buildLogger(level string) *zap.Logger {
 }
 
 // seedAdmin creates the default admin user if it doesn't exist.
-func seedAdmin(db interface{ Exec(string, ...interface{}) interface{ Error error } }, cfg *config.Config) error {
+func seedAdmin(db *gorm.DB, cfg *config.Config) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(cfg.AdminPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 	// Use INSERT ... ON CONFLICT DO NOTHING to be idempotent
-	result := db.Exec(
+	return db.Exec(
 		"INSERT INTO users (id, email, password, role, created_at, updated_at) VALUES (gen_random_uuid(), $1, $2, 'admin', NOW(), NOW()) ON CONFLICT (email) DO NOTHING",
 		cfg.AdminEmail, string(hash),
-	)
-	return result.Error
+	).Error
 }

@@ -46,3 +46,16 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// RequireAdmin rejects requests from non-admin users.
+// Must be used after the Auth middleware (which sets "user_role" in the context).
+func RequireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("user_role")
+		if !exists || role != "admin" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+			return
+		}
+		c.Next()
+	}
+}

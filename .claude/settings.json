@@ -1,0 +1,46 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep \"setProjectList\\\\|setFlowList\\\\|setApprovals\" /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/page.tsx /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/projects/[id]/page.tsx /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/flows/[id]/page.tsx)",
+      "Bash(find /Users/heytherevibin/Downloads/code/Pentagron/frontend/src -name \"*.tsx\" -exec grep -l \"setProject\\\\|setFlow\\\\|setApproval\" {} ;)",
+      "Bash(docker-compose -f docker-compose.yml build pentagron-backend pentagron-frontend)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/login)",
+      "Bash(docker-compose up -d --build pentagron-backend)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[0][''text'']\\)\")",
+      "Bash(/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/components/ui/ConfirmDialog.tsx:*)",
+      "Bash(/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/components/ui/Skeleton.tsx:*)",
+      "Bash(/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/components/ui/SlidePanel.tsx:*)",
+      "Bash(npx tsc --noEmit --pretty)",
+      "Bash(ls -la \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/\")",
+      "Bash(cat \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/projects/new/page.tsx\")",
+      "Bash(cat \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/projects/[id]/page.tsx\")",
+      "Bash(wc -l /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/components/AgentChat.tsx /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/components/GraphVisualization.tsx /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/components/ApprovalDialog.tsx \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/flows/[id]/page.tsx\")",
+      "Bash(wc -l \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/settings/page.tsx\")",
+      "Bash(npx tsc --noEmit --pretty \"src/app/\\(authenticated\\)/settings/page.tsx\")",
+      "Bash(npx tsc --noEmit --pretty \"src/app/\\(authenticated\\)/page.tsx\")",
+      "Bash(npx tsc --noEmit)",
+      "Bash(ls -la /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/projects/[id]/page.tsx)",
+      "Bash(ls -la /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/flows/[id]/page.tsx)",
+      "Bash(head -1 /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/projects/[id]/page.tsx)",
+      "Bash(head -1 /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/flows/[id]/page.tsx)",
+      "Bash(ls /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/projects/[id]/)",
+      "Bash(ls /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/flows/[id]/)",
+      "Bash(ls -la /Users/heytherevibin/Downloads/code/Pentagron/backend/pkg/api/handlers/*.go)",
+      "Bash(npm run build)",
+      "Bash(wc -l /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\\\\\(authenticated\\\\\\)/settings/page.tsx)",
+      "Bash(cat \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/settings/page.tsx\")",
+      "Bash(head -50 \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/settings/page.tsx\")",
+      "Bash(cat \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/flows/[id]/page.tsx\")",
+      "Bash(cat \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/page.tsx\")",
+      "Bash(grep -n \"c.Get\\\\|user_id\\\\|user_email\\\\|user_role\" /Users/heytherevibin/Downloads/code/Pentagron/backend/pkg/api/handlers/*.go)",
+      "Bash(wc -l /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/**/*.tsx /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/**/*.ts)"
+    ],
+    "additionalDirectories": [
+      "/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/projects/[id]",
+      "/",
+      "/Users/heytherevibin/Downloads/code/Pentagron",
+      "/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/flows/[id]"
+    ]
+  }
+}

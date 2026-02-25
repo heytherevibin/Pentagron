@@ -14,7 +14,8 @@
       "Bash(convert --version)",
       "Bash(python3 -c \"from PIL import Image; print\\(''pillow ok''\\)\")",
       "Bash(python -c \"from PIL import Image; print\\(''pillow ok''\\)\")",
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(/Users/heytherevibin/Downloads/code/Pentagron/backend/pkg/api/handlers/deps.go:*)"
     ]
   }
 }

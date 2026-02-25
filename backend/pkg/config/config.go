@@ -141,6 +141,7 @@ func Load() (*Config, error) {
 		v.SetDefault("POSTGRES_DB", "pentagron")
 		v.SetDefault("POSTGRES_HOST", "postgres")
 		v.SetDefault("POSTGRES_PORT", "5432")
+		v.SetDefault("POSTGRES_DSN", "")
 		v.SetDefault("NEO4J_URI", "bolt://neo4j:7687")
 		v.SetDefault("NEO4J_USER", "neo4j")
 		v.SetDefault("REDIS_URL", "redis://redis:6379/0")
