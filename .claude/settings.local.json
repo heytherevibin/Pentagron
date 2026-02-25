@@ -50,7 +50,9 @@
       "Bash(git commit:*)",
       "Bash(git push origin main)",
       "Bash(winget install --id GitHub.cli --silent)",
-      "Bash(winget source reset --force)"
+      "Bash(winget source reset --force)",
+      "Bash(npm run lint)",
+      "WebFetch(domain:www.npmjs.com)"
     ]
   }
 }
