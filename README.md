@@ -12,7 +12,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org)
 [![Docker](https://img.shields.io/badge/Docker-required-2496ED?logo=docker)](https://docker.com)
 [![Neo4j](https://img.shields.io/badge/Neo4j-5-008CC1?logo=neo4j)](https://neo4j.com)
-[![GitHub Issues](https://img.shields.io/github/issues/heytherevibin/Pentagron)](https://github.com/heytherevibin/Pentagron/issues)
+[![GitHub Issues](https://img.shields.io/badge/issues-open-orange?logo=github)](https://github.com/heytherevibin/Pentagron/issues)
 
 [Overview](#overview) · [Features](#key-features) · [Architecture](#architecture) · [Quick Start](#quick-start) · [Configuration](#configuration-reference) · [API](#api-reference) · [Contributing](#contributing)
 
