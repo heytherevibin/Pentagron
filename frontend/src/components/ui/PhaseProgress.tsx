@@ -9,6 +9,14 @@ interface PhaseProgressProps {
 
 const PHASES = ['recon', 'analysis', 'exploitation', 'post_exploitation', 'reporting', 'cleanup'] as const
 
+const PHASE_COLORS: Record<string, string> = {
+  completed: 'bg-emerald-500',
+  running:   'bg-blue-500 animate-pulse',
+  paused:    'bg-amber-500',
+  failed:    'bg-red-500',
+  default:   'bg-amber-500',
+}
+
 function getSegmentStyle(
   phase: string,
   currentPhase: string,
@@ -17,17 +25,9 @@ function getSegmentStyle(
   const currentIdx = PHASES.indexOf(currentPhase as typeof PHASES[number])
   const phaseIdx = PHASES.indexOf(phase as typeof PHASES[number])
 
-  if (phaseIdx < currentIdx) {
-    return 'bg-mc-emerald'
-  }
-
-  if (phaseIdx === currentIdx) {
-    if (status === 'running') return 'bg-mc-blue animate-pulse'
-    if (status === 'paused') return 'bg-mc-amber'
-    return 'bg-mc-amber'
-  }
-
-  return 'bg-mc-border'
+  if (phaseIdx < currentIdx) return 'bg-emerald-500'
+  if (phaseIdx === currentIdx) return PHASE_COLORS[status] ?? PHASE_COLORS.default
+  return 'bg-surface-3'
 }
 
 function formatPhaseLabel(phase: string): string {
@@ -51,13 +51,13 @@ export function PhaseProgress({ currentPhase, status, compact }: PhaseProgressPr
         ))}
       </div>
       {!compact && (
-        <div className="flex gap-px mt-1.5">
+        <div className="flex gap-px mt-2">
           {PHASES.map((phase, idx) => (
             <span
               key={phase}
               className={cn(
-                'flex-1 text-xxs font-mono uppercase tracking-widest-plus text-center',
-                idx === currentIdx ? 'text-mc-text' : 'text-mc-text-ghost',
+                'flex-1 text-[10px] font-mono uppercase tracking-widest-plus text-center',
+                idx === currentIdx ? 'text-foreground font-semibold' : 'text-muted',
               )}
             >
               {formatPhaseLabel(phase)}

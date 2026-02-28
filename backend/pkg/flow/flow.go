@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -173,7 +174,14 @@ func (e *FlowEngine) Run(ctx context.Context, flowID string) error {
 				zap.Error(phaseErr),
 			)
 			e.broadcastPhaseChange(flowID, phase, "failed")
-			// Non-fatal: log and continue to next phase
+
+			// Fatal: if all LLM providers are unreachable, abort the entire flow
+			// instead of burning through every phase with the same error.
+			if strings.Contains(phaseErr.Error(), "all LLM providers failed") {
+				_ = e.setFlowStatus(ctx, flowID, database.FlowStatusFailed, phase)
+				return fmt.Errorf("flow aborted: %w", phaseErr)
+			}
+			// Non-fatal tool/agent errors: log and continue to next phase
 		} else {
 			e.broadcastPhaseChange(flowID, phase, "completed")
 		}

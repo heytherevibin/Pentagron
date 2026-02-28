@@ -41,6 +41,7 @@ type Client struct {
 	send      chan []byte
 	hub       *Hub
 	log       *zap.Logger
+	closeOnce sync.Once
 }
 
 // Hub manages all active WebSocket connections and broadcasts messages.
@@ -72,7 +73,8 @@ func (h *Hub) Register(c *Client) {
 	)
 }
 
-// Unregister removes a client from the hub.
+// Unregister removes a client from the hub. Safe to call multiple times.
+// Does not close the client's send channel; the client must do that exactly once.
 func (h *Hub) Unregister(c *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -82,7 +84,6 @@ func (h *Hub) Unregister(c *Client) {
 			delete(h.clients, c.flowID)
 		}
 	}
-	close(c.send)
 }
 
 // Broadcast sends a message to all clients subscribed to a flow.
@@ -120,13 +121,22 @@ func NewClient(conn *websocket.Conn, sessionID, flowID string, hub *Hub, log *za
 	}
 }
 
+// close ensures send channel is closed once, unregisters from hub, and closes the conn.
+// Safe to call from both ReadPump and WritePump; only the first call does the work.
+func (c *Client) close() {
+	c.closeOnce.Do(func() {
+		close(c.send)
+		c.hub.Unregister(c)
+		_ = c.conn.Close()
+	})
+}
+
 // WritePump pumps messages from the send channel to the WebSocket connection.
 func (c *Client) WritePump() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
-		c.hub.Unregister(c)
+		c.close()
 	}()
 
 	for {
@@ -152,10 +162,7 @@ func (c *Client) WritePump() {
 
 // ReadPump reads incoming messages (guidance injection, approvals) from the client.
 func (c *Client) ReadPump() {
-	defer func() {
-		c.hub.Unregister(c)
-		c.conn.Close()
-	}()
+	defer c.close()
 
 	c.conn.SetReadLimit(64 * 1024)
 	_ = c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"strings"
 	"sync"
 
@@ -175,6 +176,11 @@ func Load() (*Config, error) {
 		v.SetDefault("WORKER_TLS_CERT", "")
 		v.SetDefault("WORKER_TLS_KEY", "")
 
+		// Explicitly bind all struct fields to env vars so that Unmarshal
+		// picks up Docker-injected environment variables. Without this,
+		// AutomaticEnv only works with Get() calls, not Unmarshal.
+		bindStructEnvs(v, Config{})
+
 		cfg := &Config{}
 		if err := v.Unmarshal(cfg); err != nil {
 			loadErr = err
@@ -183,6 +189,18 @@ func Load() (*Config, error) {
 		instance = cfg
 	})
 	return instance, loadErr
+}
+
+// bindStructEnvs ensures every mapstructure-tagged field is bound to its
+// corresponding OS environment variable so Viper's Unmarshal includes them.
+func bindStructEnvs(v *viper.Viper, cfg interface{}) {
+	t := reflect.TypeOf(cfg)
+	for i := 0; i < t.NumField(); i++ {
+		tag := t.Field(i).Tag.Get("mapstructure")
+		if tag != "" {
+			_ = v.BindEnv(tag)
+		}
+	}
 }
 
 // MustLoad loads configuration and panics on error.

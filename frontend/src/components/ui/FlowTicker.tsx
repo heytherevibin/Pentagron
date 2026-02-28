@@ -9,11 +9,11 @@ interface FlowTickerProps {
 const PHASES = ['recon', 'analysis', 'exploitation', 'post_exploitation', 'reporting', 'cleanup'] as const
 
 const DOT_COLORS: Record<string, string> = {
-  completed: 'bg-mc-emerald',
-  current_running: 'bg-mc-blue animate-pulse',
-  current_paused: 'bg-mc-amber',
-  current_other: 'bg-mc-amber',
-  future: 'bg-mc-border',
+  completed: 'bg-emerald-500',
+  current_running: 'bg-blue-500 animate-pulse',
+  current_paused: 'bg-amber-500',
+  current_other: 'bg-amber-500',
+  future: 'bg-surface-3',
 }
 
 function getPhaseDotStyle(
@@ -39,7 +39,7 @@ export function FlowTicker({ flow }: FlowTickerProps) {
 
   return (
     <div className="flex items-center gap-2.5 text-xs font-mono">
-      <span className="text-mc-text-dim truncate max-w-[20ch]">{flow.name}</span>
+      <span className="text-muted truncate max-w-[20ch]">{flow.name}</span>
       <StatusBadge status={flow.status} variant="flow" />
       <div className="flex items-center gap-1">
         {PHASES.map((_, idx) => (

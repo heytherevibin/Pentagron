@@ -1,6 +1,5 @@
 import { forwardRef } from 'react'
 import { cn } from '@/lib/cn'
-import { DataLabel } from './DataLabel'
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string
@@ -10,21 +9,23 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, className, ...props }, ref) => {
     return (
-      <div className="space-y-1">
-        {label && <DataLabel>{label}</DataLabel>}
+      <div className="space-y-1.5">
+        {label && (
+          <label className="section-label">{label}</label>
+        )}
         <input
           ref={ref}
           className={cn(
-            'w-full bg-mc-bg border border-mc-border text-mc-text font-mono text-sm px-3 py-2',
-            'placeholder:text-mc-text-ghost',
-            'focus:border-mc-emerald focus:outline-none',
-            error && 'border-mc-crimson focus:border-mc-crimson',
+            'w-full h-9 bg-surface-1 border border-border text-foreground font-mono text-xs px-3',
+            'placeholder:text-muted',
+            'focus:outline-none focus:border-blue-500/50',
+            error && 'border-red-500/50 focus:border-red-500/50',
             className,
           )}
           {...props}
         />
         {error && (
-          <p className="text-mc-crimson text-xxs font-mono">{error}</p>
+          <p className="text-red-400 text-[11px] font-mono">{error}</p>
         )}
       </div>
     )

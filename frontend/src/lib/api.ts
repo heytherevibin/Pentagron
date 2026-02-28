@@ -60,8 +60,8 @@ export const flows = {
   graph: (id: string) => api.get(`/api/flows/${id}/graph`),
   report: (id: string, format: 'markdown' | 'json' = 'json') =>
     api.get(`/api/flows/${id}/report`, { params: { format } }),
-  reportDownload: (id: string) =>
-    api.get(`/api/flows/${id}/report`, { responseType: 'blob' }),
+  reportDownload: (id: string, format: 'markdown' | 'pdf' = 'markdown') =>
+    api.get(`/api/flows/${id}/report`, { params: { format }, responseType: 'blob' }),
 }
 
 export const models = {
@@ -102,5 +102,6 @@ export const health = {
 export function wsUrl(path: string): string {
   const wsBase = (process.env.NEXT_PUBLIC_WS_URL ?? BASE_URL).replace(/^http/, 'ws')
   const token = typeof window !== 'undefined' ? localStorage.getItem('pentagron_token') : ''
-  return `${wsBase}${path}?token=${token}`
+  const separator = path.includes('?') ? '&' : '?'
+  return `${wsBase}${path}${separator}token=${token}`
 }

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { TagInput } from '@/components/ui/TagInput'
 import { Button } from '@/components/ui/Button'
+import { PageContentShell } from '@/components/layout/PageContentShell'
 
 export default function NewProjectPage() {
   const router = useRouter()
@@ -29,20 +30,35 @@ export default function NewProjectPage() {
         scope: tags.join(', '),
       })
       const id = res.data?.id ?? res.data?.data?.id
+      if (!id) {
+        toast.error('Invalid response: no project id')
+        return
+      }
       toast.success('Project initialized')
       router.push(`/projects/${id}`)
-    } catch {
-      toast.error('Failed to create project')
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && err !== null && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : null
+      toast.error(msg && typeof msg === 'string' ? msg : 'Failed to create project')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="flex items-start justify-center min-h-[calc(100vh-4rem)] p-6">
-      <form onSubmit={handleSubmit} className="w-full max-w-xl">
-        <Panel title="NEW ENGAGEMENT">
-          <div className="space-y-5">
+    <PageContentShell>
+      <div className="animate-fade-in space-y-6">
+        {/* Page header — same structure as project detail */}
+        <div>
+          <h1 className="page-title">New Engagement</h1>
+          <p className="page-subtitle">Configure a new penetration testing project</p>
+        </div>
+
+        {/* Single full-width panel — matches PROJECT INFO / ENGAGEMENT FLOWS layout */}
+        <form onSubmit={handleSubmit}>
+          <Panel title="PROJECT CONFIGURATION" contentClassName="space-y-5">
             <Input
               label="PROJECT NAME"
               required
@@ -67,10 +83,11 @@ export default function NewProjectPage() {
               placeholder="*.example.com, 10.0.0.0/24"
             />
 
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-mc-border">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
               <Button
                 type="button"
                 variant="ghost"
+                size="md"
                 onClick={() => router.back()}
               >
                 Cancel
@@ -78,14 +95,15 @@ export default function NewProjectPage() {
               <Button
                 type="submit"
                 variant="primary"
+                size="md"
                 loading={submitting}
               >
                 Initialize Project
               </Button>
             </div>
-          </div>
-        </Panel>
-      </form>
-    </div>
+          </Panel>
+        </form>
+      </div>
+    </PageContentShell>
   )
 }

@@ -268,6 +268,9 @@ func main() {
 		}
 	}
 
+	// Close MCP SSE connections
+	mcpMgr.Close()
+
 	// Flush any buffered Langfuse events before exit
 	langfuse.Flush(ctx)
 

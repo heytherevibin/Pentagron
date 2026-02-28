@@ -32,7 +32,6 @@ export default function SetupPage() {
   const [loading, setLoading] = useState(false)
   const [checkingProjects, setCheckingProjects] = useState(true)
 
-  // If projects already exist, redirect to dashboard
   useEffect(() => {
     projectsApi.list()
       .then((res) => {
@@ -66,20 +65,20 @@ export default function SetupPage() {
 
   if (checkingProjects) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <span className="text-mc-text-dim text-sm font-mono animate-pulse">INITIALIZING...</span>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <span className="text-muted text-sm font-mono animate-pulse">Initializing...</span>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="w-full max-w-xl space-y-6">
         {/* Title */}
         <div className="text-center space-y-1">
-          <h1 className="text-xl font-bold font-mono text-mc-emerald">[PENTAGRON]</h1>
-          <div className="text-xxs font-mono font-medium uppercase tracking-widest-plus text-mc-text-muted">
-            FIRST-TIME SETUP
+          <h1 className="text-xl font-bold font-mono text-blue-500">[PENTAGRON]</h1>
+          <div className="text-[10px] font-mono font-medium uppercase tracking-widest-plus text-muted">
+            First-time Setup
           </div>
         </div>
 
@@ -91,10 +90,10 @@ export default function SetupPage() {
                 className={cn(
                   'w-8 h-8 flex items-center justify-center text-xs font-mono font-bold border',
                   s === step
-                    ? 'bg-mc-emerald text-mc-bg border-mc-emerald'
+                    ? 'bg-blue-600 text-white border-blue-600'
                     : s < step
-                      ? 'bg-mc-emerald/20 text-mc-emerald border-mc-emerald/40'
-                      : 'bg-mc-bg text-mc-text-ghost border-mc-border',
+                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                      : 'bg-background text-muted border-border',
                 )}
               >
                 {s}
@@ -103,7 +102,7 @@ export default function SetupPage() {
                 <div
                   className={cn(
                     'w-16 h-px',
-                    s < step ? 'bg-mc-emerald/40' : 'bg-mc-border',
+                    s < step ? 'bg-blue-500/40' : 'bg-border',
                   )}
                 />
               )}
@@ -113,12 +112,12 @@ export default function SetupPage() {
 
         {/* Step labels */}
         <div className="flex items-center justify-center gap-0 -mt-3">
-          {['CONFIGURE', 'CREATE PROJECT', 'LAUNCH'].map((label, i) => (
+          {['Configure', 'Create Project', 'Launch'].map((label, i) => (
             <div key={label} className={cn('text-center', i < 2 ? 'w-24 mr-16' : 'w-24')}>
               <span
                 className={cn(
-                  'text-xxs font-mono uppercase tracking-wider',
-                  i + 1 === step ? 'text-mc-emerald' : 'text-mc-text-ghost',
+                  'text-[10px] font-mono uppercase tracking-wider',
+                  i + 1 === step ? 'text-blue-400' : 'text-muted',
                 )}
               >
                 {label}
@@ -131,12 +130,12 @@ export default function SetupPage() {
         <Panel title={step === 1 ? 'CONFIGURE LLM PROVIDER' : step === 2 ? 'CREATE PROJECT' : 'REVIEW & LAUNCH'}>
           {step === 1 && (
             <div className="space-y-4">
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <DataLabel>PROVIDER</DataLabel>
                 <select
                   value={provider}
                   onChange={(e) => setProvider(e.target.value as Provider)}
-                  className="w-full bg-mc-bg border border-mc-border text-mc-text font-mono text-sm px-3 py-2 focus:border-mc-emerald focus:outline-none"
+                  className="w-full bg-surface-1 border border-border text-foreground font-mono text-sm px-3 py-2 focus:border-blue-500/50 focus:outline-none"
                 >
                   {PROVIDERS.map((p) => (
                     <option key={p.value} value={p.value}>
@@ -154,7 +153,7 @@ export default function SetupPage() {
                 placeholder="sk-••••••••••••••••"
               />
 
-              <p className="text-xxs font-mono text-mc-text-ghost">
+              <p className="text-[10px] font-mono text-muted">
                 Your API key is stored locally and sent to the backend over an encrypted connection.
               </p>
             </div>
@@ -191,23 +190,23 @@ export default function SetupPage() {
           {step === 3 && (
             <div className="space-y-4">
               <div className="space-y-3 text-sm font-mono">
-                <div className="flex items-start justify-between border-b border-mc-border pb-2">
+                <div className="flex items-start justify-between border-b border-border pb-2">
                   <DataLabel>PROVIDER</DataLabel>
-                  <span className="text-mc-text">{provider.toUpperCase()}</span>
+                  <span className="text-foreground">{provider.toUpperCase()}</span>
                 </div>
-                <div className="flex items-start justify-between border-b border-mc-border pb-2">
+                <div className="flex items-start justify-between border-b border-border pb-2">
                   <DataLabel>API KEY</DataLabel>
-                  <span className="text-mc-text-dim">
+                  <span className="text-muted">
                     {llmKey ? `${llmKey.slice(0, 6)}${'•'.repeat(12)}` : '(not set)'}
                   </span>
                 </div>
-                <div className="flex items-start justify-between border-b border-mc-border pb-2">
+                <div className="flex items-start justify-between border-b border-border pb-2">
                   <DataLabel>PROJECT</DataLabel>
-                  <span className="text-mc-text">{projectName || '(unnamed)'}</span>
+                  <span className="text-foreground">{projectName || '(unnamed)'}</span>
                 </div>
-                <div className="flex items-start justify-between border-b border-mc-border pb-2">
+                <div className="flex items-start justify-between border-b border-border pb-2">
                   <DataLabel>DESCRIPTION</DataLabel>
-                  <span className="text-mc-text-dim text-right max-w-[60%] truncate">
+                  <span className="text-muted text-right max-w-[60%] truncate">
                     {projectDesc || '(none)'}
                   </span>
                 </div>
@@ -218,13 +217,13 @@ export default function SetupPage() {
                       projectScope.map((s) => (
                         <span
                           key={s}
-                          className="px-2 py-0.5 bg-mc-bg border border-mc-border text-mc-text-dim text-xs font-mono"
+                          className="px-2 py-0.5 bg-surface-2 border border-border text-muted text-xs font-mono"
                         >
                           {s}
                         </span>
                       ))
                     ) : (
-                      <span className="text-mc-text-ghost text-xs">(none)</span>
+                      <span className="text-muted text-xs">(none)</span>
                     )}
                   </div>
                 </div>
@@ -241,14 +240,14 @@ export default function SetupPage() {
                 variant="outline"
                 onClick={() => setStep((prev) => (prev - 1) as 1 | 2 | 3)}
               >
-                BACK
+                Back
               </Button>
             )}
           </div>
 
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => router.push('/')}>
-              SKIP
+              Skip
             </Button>
 
             {step < 3 ? (
@@ -256,7 +255,7 @@ export default function SetupPage() {
                 variant="primary"
                 onClick={() => setStep((prev) => (prev + 1) as 1 | 2 | 3)}
               >
-                NEXT
+                Next
               </Button>
             ) : (
               <Button
@@ -264,7 +263,7 @@ export default function SetupPage() {
                 loading={loading}
                 onClick={handleComplete}
               >
-                INITIALIZE FIRST FLOW
+                Initialize First Flow
               </Button>
             )}
           </div>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -275,7 +276,8 @@ func GetMCPSettings(d *Deps) gin.HandlerFunc {
 	}
 }
 
-// UpdateMCPSettings patches MCP server URLs in-memory and persists to DB.
+// UpdateMCPSettings patches MCP server URLs in-memory, persists to DB, and re-registers
+// MCP clients so health checks and tool calls use the new URLs.
 func UpdateMCPSettings(d *Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var body struct {
@@ -286,21 +288,25 @@ func UpdateMCPSettings(d *Deps) gin.HandlerFunc {
 			return
 		}
 
-		if v, ok := body.Servers["naabu"]; ok {
-			d.Config.MCPNaabuURL = v
-			_ = persistSetting(d, "MCP_NAABU_URL", v)
+		if v, ok := body.Servers["naabu"]; ok && v != "" {
+			d.Config.MCPNaabuURL = strings.TrimSpace(v)
+			_ = persistSetting(d, "MCP_NAABU_URL", d.Config.MCPNaabuURL)
+			d.MCPMgr.Register("naabu", d.Config.MCPNaabuURL)
 		}
-		if v, ok := body.Servers["sqlmap"]; ok {
-			d.Config.MCPSQLMapURL = v
-			_ = persistSetting(d, "MCP_SQLMAP_URL", v)
+		if v, ok := body.Servers["sqlmap"]; ok && v != "" {
+			d.Config.MCPSQLMapURL = strings.TrimSpace(v)
+			_ = persistSetting(d, "MCP_SQLMAP_URL", d.Config.MCPSQLMapURL)
+			d.MCPMgr.Register("sqlmap", d.Config.MCPSQLMapURL)
 		}
-		if v, ok := body.Servers["nuclei"]; ok {
-			d.Config.MCPNucleiURL = v
-			_ = persistSetting(d, "MCP_NUCLEI_URL", v)
+		if v, ok := body.Servers["nuclei"]; ok && v != "" {
+			d.Config.MCPNucleiURL = strings.TrimSpace(v)
+			_ = persistSetting(d, "MCP_NUCLEI_URL", d.Config.MCPNucleiURL)
+			d.MCPMgr.Register("nuclei", d.Config.MCPNucleiURL)
 		}
-		if v, ok := body.Servers["metasploit"]; ok {
-			d.Config.MCPMetasploitURL = v
-			_ = persistSetting(d, "MCP_METASPLOIT_URL", v)
+		if v, ok := body.Servers["metasploit"]; ok && v != "" {
+			d.Config.MCPMetasploitURL = strings.TrimSpace(v)
+			_ = persistSetting(d, "MCP_METASPLOIT_URL", d.Config.MCPMetasploitURL)
+			d.MCPMgr.Register("metasploit", d.Config.MCPMetasploitURL)
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "MCP settings updated"})
@@ -308,30 +314,41 @@ func UpdateMCPSettings(d *Deps) gin.HandlerFunc {
 }
 
 // TestMCPServer runs a health check against a single MCP server.
+// Accepts "server" or "name" in the body; name is normalized to lowercase for lookup (e.g. Naabu -> naabu).
 func TestMCPServer(d *Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var body struct {
-			Server string `json:"server" binding:"required"`
+			Server string `json:"server"`
+			Name   string `json:"name"`
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		key := strings.TrimSpace(body.Server)
+		if key == "" {
+			key = strings.TrimSpace(body.Name)
+		}
+		if key == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "server or name required"})
+			return
+		}
+		key = strings.ToLower(key)
 
 		ctx := c.Request.Context()
 		start := time.Now()
 		statuses := d.MCPMgr.HealthCheck(ctx)
 		latency := time.Since(start).Milliseconds()
 
-		err, exists := statuses[body.Server]
+		err, exists := statuses[key]
 		if !exists {
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("MCP server %q not registered", body.Server)})
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("MCP server %q not registered", key)})
 			return
 		}
 
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
-				"server":     body.Server,
+				"server":     key,
 				"status":     "error",
 				"error":      err.Error(),
 				"latency_ms": latency,
@@ -340,7 +357,7 @@ func TestMCPServer(d *Deps) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"server":     body.Server,
+			"server":     key,
 			"status":     "ok",
 			"latency_ms": latency,
 		})

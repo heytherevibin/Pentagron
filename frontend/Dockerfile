@@ -7,10 +7,8 @@ RUN npm ci
 # ── Stage 2: Dev (hot reload) ─────────────────────────────────────────────────
 FROM node:22-alpine AS dev
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci
 EXPOSE 3000
-CMD ["npm", "run", "dev"]
+CMD ["sh", "-c", "npm ci && npm run dev"]
 
 # ── Stage 3: Builder ──────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder

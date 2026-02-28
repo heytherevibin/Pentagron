@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -9,6 +10,7 @@ import { DataLabel } from '@/components/ui/DataLabel'
 import { GlowDot } from '@/components/ui/GlowDot'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { PageContentShell } from '@/components/layout/PageContentShell'
 import { api } from '@/lib/api'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -153,14 +155,14 @@ function Toggle({
       onClick={() => onChange(!checked)}
       className={`
         relative inline-flex h-5 w-9 shrink-0 items-center border transition-colors
-        ${checked ? 'bg-mc-emerald/20 border-mc-emerald' : 'bg-mc-bg border-mc-border'}
+        ${checked ? 'bg-blue-500/20 border-blue-500' : 'bg-background border-border'}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
       `}
     >
       <span
         className={`
           inline-block h-3 w-3 transform transition-transform
-          ${checked ? 'translate-x-[18px] bg-mc-emerald' : 'translate-x-[3px] bg-mc-text-ghost'}
+          ${checked ? 'translate-x-[18px] bg-blue-500' : 'translate-x-[3px] bg-muted'}
         `}
       />
     </button>
@@ -186,7 +188,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-mc-bg border border-mc-border text-mc-text font-mono text-sm px-3 py-2 focus:border-mc-emerald focus:outline-none appearance-none cursor-pointer"
+        className="w-full bg-background border border-border text-foreground font-mono text-sm px-3 py-2 focus:border-blue-500/50 focus:outline-none appearance-none cursor-pointer"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -262,12 +264,12 @@ function MaskedInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder ?? '****'}
-          className="w-full bg-mc-bg border border-mc-border text-mc-text font-mono text-sm px-3 py-2 pr-9 placeholder:text-mc-text-ghost focus:border-mc-emerald focus:outline-none"
+          className="w-full bg-background border border-border text-foreground font-mono text-sm px-3 py-2 pr-9 placeholder:text-muted focus:border-blue-500/50 focus:outline-none"
         />
         <button
           type="button"
           onClick={() => setVisible(!visible)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-mc-text-ghost hover:text-mc-text-dim transition-colors"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-muted transition-colors"
           tabIndex={-1}
         >
           <EyeIcon open={!visible} />
@@ -294,8 +296,19 @@ function TabSkeleton() {
 // SETTINGS PAGE
 // =============================================================================
 
+const TAB_KEYS: TabKey[] = ['general', 'llm', 'agents', 'mcp', 'users', 'health']
+
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>('general')
+  const searchParams = useSearchParams()
+  const tabFromUrl = searchParams.get('tab')
+  const initialTab: TabKey =
+    tabFromUrl && TAB_KEYS.includes(tabFromUrl as TabKey) ? (tabFromUrl as TabKey) : 'general'
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
+
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t && TAB_KEYS.includes(t as TabKey)) setActiveTab(t as TabKey)
+  }, [searchParams])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -427,21 +440,13 @@ export default function SettingsPage() {
     try {
       const res = await api.get('/api/settings/mcp')
       const data = res.data?.data ?? res.data
-      if (data?.servers && Array.isArray(data.servers)) {
+      const servers = data?.servers
+      if (servers && typeof servers === 'object' && !Array.isArray(servers)) {
         setMcpServers((prev) =>
-          prev.map((s) => {
-            const remote = data.servers.find(
-              (r: Record<string, unknown>) => (r.name as string)?.toLowerCase() === s.name.toLowerCase()
-            )
-            if (remote) {
-              return {
-                ...s,
-                url: (remote.url as string) ?? s.url,
-                status: (remote.status as DotStatus) ?? 'offline',
-              }
-            }
-            return s
-          })
+          prev.map((s) => ({
+            ...s,
+            url: (servers[s.name.toLowerCase()] as string) ?? s.url,
+          }))
         )
       }
     } catch {
@@ -489,15 +494,16 @@ export default function SettingsPage() {
             )
           : PROVIDER_OPTIONS.map((name) => ({ name, status: 'offline' as DotStatus }))
 
+      const mcpRaw = mcpRes.status === 'fulfilled' ? (mcpRes.value.data?.data ?? mcpRes.value.data) : null
       const mcpSvcs: HealthService[] =
-        mcpRes.status === 'fulfilled'
-          ? (mcpRes.value.data?.data ?? mcpRes.value.data ?? []).map(
-              (s: Record<string, unknown>) => ({
-                name: s.name as string,
-                status: (s.status as DotStatus) ?? 'offline',
-                error: s.error as string | undefined,
-              })
-            )
+        mcpRaw && typeof mcpRaw === 'object' && !Array.isArray(mcpRaw)
+          ? Object.entries(mcpRaw).map(([key, value]) => {
+              const statusStr = String(value)
+              const status: DotStatus = statusStr === 'ok' ? 'ok' : 'error'
+              const error = statusStr.startsWith('error: ') ? statusStr.slice(7) : undefined
+              const displayNames: Record<string, string> = { naabu: 'Naabu', sqlmap: 'SQLMap', nuclei: 'Nuclei', metasploit: 'Metasploit' }
+              return { name: displayNames[key] ?? key, status, error }
+            })
           : DEFAULT_MCP_SERVERS.map((s) => ({ name: s.name, status: 'offline' as DotStatus }))
 
       // Check databases and docker — attempt individual endpoints or use mock
@@ -637,13 +643,11 @@ export default function SettingsPage() {
   async function saveMCP() {
     setSaving(true)
     try {
-      await api.put('/api/settings/mcp', {
-        servers: mcpServers.map((s) => ({
-          name: s.name,
-          url: s.url,
-          port: s.port,
-        })),
+      const servers: Record<string, string> = {}
+      mcpServers.forEach((s) => {
+        servers[s.name.toLowerCase()] = s.url
       })
+      await api.put('/api/settings/mcp', { servers })
       toast.success('MCP settings saved')
     } catch {
       toast.error('Failed to save MCP settings')
@@ -679,10 +683,8 @@ export default function SettingsPage() {
       prev.map((s) => (s.name === serverName ? { ...s, testing: true } : s))
     )
     try {
-      const server = mcpServers.find((s) => s.name === serverName)
       const res = await api.post(`/api/settings/mcp/test`, {
-        name: serverName,
-        url: server?.url,
+        server: serverName.toLowerCase(),
       })
       const data = res.data?.data ?? res.data
       const status: DotStatus = data?.status === 'ok' ? 'ok' : 'error'
@@ -787,7 +789,7 @@ export default function SettingsPage() {
           <div className="space-y-5">
             <div className="flex items-center gap-4">
               <DataLabel>APP NAME</DataLabel>
-              <span className="text-sm font-mono text-mc-emerald font-bold tracking-wider">
+              <span className="text-sm font-mono text-blue-500 font-bold tracking-wider">
                 PENTAGRON
               </span>
             </div>
@@ -795,8 +797,8 @@ export default function SettingsPage() {
             <div className="flex items-center gap-4">
               <DataLabel>SERVER STATUS</DataLabel>
               <div className="flex items-center gap-2">
-                <GlowDot status={serverStatus} size="md" pulse={serverStatus === 'ok'} />
-                <span className="text-xs font-mono text-mc-text-dim uppercase">
+                <GlowDot status={serverStatus} size="md" />
+                <span className="text-xs font-mono text-muted uppercase">
                   {serverStatus === 'ok' ? 'ONLINE' : serverStatus === 'error' ? 'ERROR' : 'OFFLINE'}
                 </span>
               </div>
@@ -824,7 +826,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <DataLabel>AUTO-APPROVAL</DataLabel>
-                <p className="text-xxs font-mono text-mc-text-ghost mt-0.5">
+                <p className="text-xxs font-mono text-muted mt-0.5">
                   skip approval gates for non-exploitation phases
                 </p>
               </div>
@@ -868,12 +870,12 @@ export default function SettingsPage() {
             {providers.map((provider) => (
               <div
                 key={provider.name}
-                className="border border-mc-border bg-mc-bg p-4 space-y-3"
+                className="border border-border bg-background p-4 space-y-3"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <GlowDot status={provider.status} size="md" />
-                    <span className="text-sm font-mono font-bold text-mc-text uppercase tracking-wider">
+                    <span className="text-sm font-mono font-bold text-foreground uppercase tracking-wider">
                       {provider.label}
                     </span>
                   </div>
@@ -925,7 +927,7 @@ export default function SettingsPage() {
         <Panel title="PER-AGENT MODEL OVERRIDES">
           <div>
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_2fr] gap-4 px-3 py-2 border-b border-mc-border">
+            <div className="grid grid-cols-[1fr_2fr] gap-4 px-3 py-2 border-b border-border">
               <DataLabel>AGENT</DataLabel>
               <DataLabel>MODEL OVERRIDE</DataLabel>
             </div>
@@ -934,9 +936,9 @@ export default function SettingsPage() {
             {agentOverrides.map((override) => (
               <div
                 key={override.agent}
-                className="grid grid-cols-[1fr_2fr] gap-4 px-3 py-3 border-b border-mc-border last:border-b-0 items-center"
+                className="grid grid-cols-[1fr_2fr] gap-4 px-3 py-3 border-b border-border last:border-b-0 items-center"
               >
-                <span className="text-xs font-mono text-mc-text-dim uppercase tracking-wider">
+                <span className="text-xs font-mono text-muted uppercase tracking-wider">
                   {override.agent}
                 </span>
                 <input
@@ -952,7 +954,7 @@ export default function SettingsPage() {
                     )
                   }
                   placeholder="leave empty for default"
-                  className="w-full bg-mc-bg border border-mc-border text-mc-text font-mono text-sm px-3 py-1.5 placeholder:text-mc-text-ghost focus:border-mc-emerald focus:outline-none"
+                  className="w-full bg-background border border-border text-foreground font-mono text-sm px-3 py-1.5 placeholder:text-muted focus:border-blue-500/50 focus:outline-none"
                 />
               </div>
             ))}
@@ -990,7 +992,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <DataLabel>REQUIRE APPROVAL</DataLabel>
-                <p className="text-xxs font-mono text-mc-text-ghost mt-0.5">
+                <p className="text-xxs font-mono text-muted mt-0.5">
                   require human approval before phase transitions
                 </p>
               </div>
@@ -1003,7 +1005,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <DataLabel>EVOGRAPH ENABLED</DataLabel>
-                <p className="text-xxs font-mono text-mc-text-ghost mt-0.5">
+                <p className="text-xxs font-mono text-muted mt-0.5">
                   enable Neo4j-backed attack chain memory graph
                 </p>
               </div>
@@ -1016,7 +1018,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <DataLabel>VECTOR STORE ENABLED</DataLabel>
-                <p className="text-xxs font-mono text-mc-text-ghost mt-0.5">
+                <p className="text-xxs font-mono text-muted mt-0.5">
                   enable pgvector semantic memory for context retrieval
                 </p>
               </div>
@@ -1042,7 +1044,7 @@ export default function SettingsPage() {
                 }))
               }
             />
-            <p className="text-xxs font-mono text-mc-text-ghost -mt-3">
+            <p className="text-xxs font-mono text-muted -mt-3">
               {(agentSettings.summarizerMaxInputBytes / 1024).toFixed(0)} KB
             </p>
 
@@ -1058,7 +1060,7 @@ export default function SettingsPage() {
                 }))
               }
             />
-            <p className="text-xxs font-mono text-mc-text-ghost -mt-3">
+            <p className="text-xxs font-mono text-muted -mt-3">
               {(agentSettings.summarizerMaxOutputBytes / 1024).toFixed(0)} KB
             </p>
           </div>
@@ -1079,7 +1081,7 @@ export default function SettingsPage() {
         <Panel title="MCP SERVER CONFIGURATION">
           <div>
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_2fr_auto_auto] gap-4 px-3 py-2 border-b border-mc-border">
+            <div className="grid grid-cols-[1fr_2fr_auto_auto] gap-4 px-3 py-2 border-b border-border">
               <DataLabel>SERVER</DataLabel>
               <DataLabel>URL</DataLabel>
               <DataLabel>STATUS</DataLabel>
@@ -1090,13 +1092,13 @@ export default function SettingsPage() {
             {mcpServers.map((server) => (
               <div
                 key={server.name}
-                className="grid grid-cols-[1fr_2fr_auto_auto] gap-4 px-3 py-3 border-b border-mc-border last:border-b-0 items-center"
+                className="grid grid-cols-[1fr_2fr_auto_auto] gap-4 px-3 py-3 border-b border-border last:border-b-0 items-center"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-mono text-mc-text font-bold uppercase tracking-wider">
+                  <span className="text-sm font-mono text-foreground font-bold uppercase tracking-wider">
                     {server.name}
                   </span>
-                  <span className="text-xxs font-mono text-mc-text-ghost">
+                  <span className="text-xxs font-mono text-muted">
                     :{server.port}
                   </span>
                 </div>
@@ -1113,12 +1115,12 @@ export default function SettingsPage() {
                       )
                     )
                   }
-                  className="w-full bg-mc-bg border border-mc-border text-mc-text font-mono text-sm px-3 py-1.5 placeholder:text-mc-text-ghost focus:border-mc-emerald focus:outline-none"
+                  className="w-full bg-background border border-border text-foreground font-mono text-sm px-3 py-1.5 placeholder:text-muted focus:border-blue-500/50 focus:outline-none"
                 />
 
                 <div className="flex items-center gap-2 min-w-[80px]">
                   <GlowDot status={server.status} size="md" />
-                  <span className="text-xxs font-mono text-mc-text-dim uppercase">
+                  <span className="text-xxs font-mono text-muted uppercase">
                     {server.status === 'ok' ? 'ONLINE' : server.status === 'error' ? 'ERROR' : 'OFFLINE'}
                   </span>
                 </div>
@@ -1163,7 +1165,7 @@ export default function SettingsPage() {
           {/* Invite Form */}
           {inviteOpen && (
             <form onSubmit={handleInviteUser} className="mb-4">
-              <div className="border border-mc-border bg-mc-bg p-4 space-y-4">
+              <div className="border border-border bg-background p-4 space-y-4">
                 <DataLabel>NEW USER INVITATION</DataLabel>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1194,7 +1196,7 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-mc-border">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
                   <Button
                     type="button"
                     variant="ghost"
@@ -1219,7 +1221,7 @@ export default function SettingsPage() {
           {/* User Table */}
           <div>
             {/* Header */}
-            <div className="grid grid-cols-[2fr_1fr_0.5fr_1.5fr_0.5fr_auto] gap-3 px-3 py-2 border-b border-mc-border">
+            <div className="grid grid-cols-[2fr_1fr_0.5fr_1.5fr_0.5fr_auto] gap-3 px-3 py-2 border-b border-border">
               <DataLabel>EMAIL</DataLabel>
               <DataLabel>ROLE</DataLabel>
               <DataLabel>PROJECTS</DataLabel>
@@ -1232,9 +1234,9 @@ export default function SettingsPage() {
             {users.map((user) => (
               <div
                 key={user.id}
-                className="grid grid-cols-[2fr_1fr_0.5fr_1.5fr_0.5fr_auto] gap-3 px-3 py-3 border-b border-mc-border last:border-b-0 items-center"
+                className="grid grid-cols-[2fr_1fr_0.5fr_1.5fr_0.5fr_auto] gap-3 px-3 py-3 border-b border-border last:border-b-0 items-center"
               >
-                <span className="text-sm font-mono text-mc-text truncate">
+                <span className="text-sm font-mono text-foreground truncate">
                   {user.email}
                 </span>
 
@@ -1244,7 +1246,7 @@ export default function SettingsPage() {
                     handleUpdateUserRole(user.id, e.target.value as UserRecord['role'])
                   }
                   disabled={user.status === 'inactive'}
-                  className="bg-mc-bg border border-mc-border text-mc-text font-mono text-xs px-2 py-1 focus:border-mc-emerald focus:outline-none appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-background border border-border text-foreground font-mono text-xs px-2 py-1 focus:border-blue-500/50 focus:outline-none appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {ROLE_OPTIONS.map((r) => (
                     <option key={r} value={r}>
@@ -1253,11 +1255,11 @@ export default function SettingsPage() {
                   ))}
                 </select>
 
-                <span className="text-xs font-mono text-mc-text-dim text-center">
+                <span className="text-xs font-mono text-muted text-center">
                   {user.projects}
                 </span>
 
-                <span className="text-xs font-mono text-mc-text-ghost">
+                <span className="text-xs font-mono text-muted">
                   {user.lastLogin ? formatDate(user.lastLogin) : '--'}
                 </span>
 
@@ -1266,7 +1268,7 @@ export default function SettingsPage() {
                     status={user.status === 'active' ? 'ok' : 'offline'}
                     size="sm"
                   />
-                  <span className="text-xxs font-mono text-mc-text-dim uppercase">
+                  <span className="text-xxs font-mono text-muted uppercase">
                     {user.status}
                   </span>
                 </div>
@@ -1287,7 +1289,7 @@ export default function SettingsPage() {
 
             {users.length === 0 && (
               <div className="px-3 py-8 text-center">
-                <p className="text-mc-text-ghost text-xs font-mono">no users found</p>
+                <p className="text-muted text-xs font-mono">no users found</p>
               </div>
             )}
           </div>
@@ -1328,28 +1330,28 @@ export default function SettingsPage() {
           <Panel title="LLM PROVIDERS">
             <div className="space-y-3">
               {healthData.llmProviders.length === 0 ? (
-                <p className="text-mc-text-ghost text-xs font-mono">no data</p>
+                <p className="text-muted text-xs font-mono">no data</p>
               ) : (
                 healthData.llmProviders.map((p) => (
                   <div key={p.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <GlowDot status={p.status} size="md" />
-                      <span className="text-sm font-mono text-mc-text uppercase tracking-wider">
+                      <span className="text-sm font-mono text-foreground uppercase tracking-wider">
                         {p.name}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
                       {p.latency != null && (
-                        <span className="text-xxs font-mono text-mc-text-ghost">
+                        <span className="text-xxs font-mono text-muted">
                           {p.latency}ms
                         </span>
                       )}
                       {p.error && (
-                        <span className="text-xxs font-mono text-mc-crimson truncate max-w-[150px]">
+                        <span className="text-xxs font-mono text-red-400 truncate max-w-[150px]">
                           {p.error}
                         </span>
                       )}
-                      <span className="text-xxs font-mono text-mc-text-dim uppercase">
+                      <span className="text-xxs font-mono text-muted uppercase">
                         {p.status === 'ok' ? 'ONLINE' : p.status === 'error' ? 'ERROR' : 'OFFLINE'}
                       </span>
                     </div>
@@ -1363,23 +1365,23 @@ export default function SettingsPage() {
           <Panel title="MCP SERVERS">
             <div className="space-y-3">
               {healthData.mcpServers.length === 0 ? (
-                <p className="text-mc-text-ghost text-xs font-mono">no data</p>
+                <p className="text-muted text-xs font-mono">no data</p>
               ) : (
                 healthData.mcpServers.map((s) => (
                   <div key={s.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <GlowDot status={s.status} size="md" />
-                      <span className="text-sm font-mono text-mc-text uppercase tracking-wider">
+                      <span className="text-sm font-mono text-foreground uppercase tracking-wider">
                         {s.name}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       {s.error && (
-                        <span className="text-xxs font-mono text-mc-crimson truncate max-w-[150px]">
+                        <span className="text-xxs font-mono text-red-400 truncate max-w-[150px]">
                           {s.error}
                         </span>
                       )}
-                      <span className="text-xxs font-mono text-mc-text-dim uppercase">
+                      <span className="text-xxs font-mono text-muted uppercase">
                         {s.status === 'ok' ? 'ONLINE' : s.status === 'error' ? 'ERROR' : 'OFFLINE'}
                       </span>
                     </div>
@@ -1398,11 +1400,11 @@ export default function SettingsPage() {
                     <div key={name} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <GlowDot status="offline" size="md" />
-                        <span className="text-sm font-mono text-mc-text uppercase tracking-wider">
+                        <span className="text-sm font-mono text-foreground uppercase tracking-wider">
                           {name}
                         </span>
                       </div>
-                      <span className="text-xxs font-mono text-mc-text-dim uppercase">
+                      <span className="text-xxs font-mono text-muted uppercase">
                         OFFLINE
                       </span>
                     </div>
@@ -1413,17 +1415,17 @@ export default function SettingsPage() {
                   <div key={d.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <GlowDot status={d.status} size="md" />
-                      <span className="text-sm font-mono text-mc-text uppercase tracking-wider">
+                      <span className="text-sm font-mono text-foreground uppercase tracking-wider">
                         {d.name}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
                       {d.latency != null && (
-                        <span className="text-xxs font-mono text-mc-text-ghost">
+                        <span className="text-xxs font-mono text-muted">
                           {d.latency}ms
                         </span>
                       )}
-                      <span className="text-xxs font-mono text-mc-text-dim uppercase">
+                      <span className="text-xxs font-mono text-muted uppercase">
                         {d.status === 'ok' ? 'ONLINE' : d.status === 'error' ? 'ERROR' : 'OFFLINE'}
                       </span>
                     </div>
@@ -1439,17 +1441,17 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <GlowDot status={healthData.docker.status} size="md" />
-                  <span className="text-sm font-mono text-mc-text uppercase tracking-wider">
+                  <span className="text-sm font-mono text-foreground uppercase tracking-wider">
                     {healthData.docker.name}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
                   {healthData.docker.latency != null && (
-                    <span className="text-xxs font-mono text-mc-text-ghost">
+                    <span className="text-xxs font-mono text-muted">
                       {healthData.docker.latency}ms
                     </span>
                   )}
-                  <span className="text-xxs font-mono text-mc-text-dim uppercase">
+                  <span className="text-xxs font-mono text-muted uppercase">
                     {healthData.docker.status === 'ok'
                       ? 'ONLINE'
                       : healthData.docker.status === 'error'
@@ -1459,7 +1461,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               {healthData.docker.error && (
-                <p className="text-xxs font-mono text-mc-crimson">{healthData.docker.error}</p>
+                <p className="text-xxs font-mono text-red-400">{healthData.docker.error}</p>
               )}
             </div>
           </Panel>
@@ -1482,19 +1484,15 @@ export default function SettingsPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 space-y-0 max-w-7xl mx-auto">
+    <PageContentShell variant="surface">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="text-lg font-mono font-bold text-mc-text uppercase tracking-wider">
-          SETTINGS
-        </h1>
-        <p className="text-xs font-mono text-mc-text-ghost mt-1">
-          system configuration and administration
-        </p>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-subtitle">System configuration and administration</p>
       </div>
 
       {/* Tab Bar */}
-      <div className="flex items-center gap-0 border-b border-mc-border mb-6">
+      <div className="flex items-center gap-0 border-b border-border mb-6">
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -1503,15 +1501,15 @@ export default function SettingsPage() {
               px-4 py-2.5 font-mono text-xs uppercase tracking-wider transition-colors relative
               ${
                 activeTab === tab.key
-                  ? 'text-mc-emerald'
-                  : 'text-mc-text-ghost hover:text-mc-text-dim'
+                  ? 'text-blue-500'
+                  : 'text-muted hover:text-muted'
               }
             `}
           >
             {tab.label}
             {/* Active underline */}
             {activeTab === tab.key && (
-              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-mc-emerald" />
+              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-500" />
             )}
           </button>
         ))}
@@ -1521,6 +1519,6 @@ export default function SettingsPage() {
       <div className="min-h-[500px] overflow-y-auto">
         {loading ? <TabSkeleton /> : TAB_CONTENT[activeTab]()}
       </div>
-    </div>
+    </PageContentShell>
   )
 }
