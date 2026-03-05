@@ -11,6 +11,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2026-02-28
+
+### Changed
+
+#### Code Refactoring
+- **Frontend refactor** — improved component structure and styling consistency across all authenticated routes
+  - `flows/[id]/page.tsx`: 218 lines → 217 lines (mission control UI refinement)
+  - `projects/[id]/page.tsx`: 116 lines → 112 lines (project detail view optimization)
+  - `page.tsx` (dashboard): 110 lines (stats grid and activity feed updates)
+  - `settings/page.tsx`: 96 lines revised (admin panel UX improvements)
+  - `layout.tsx`: 36 lines (auth layout refinements)
+  - `projects/new/page.tsx`: 29 lines (scope input validation)
+  - `globals.css`: 225 additions, 73 deletions (terminal aesthetic theme enhancements)
+  - `app/layout.tsx`: metadata and provider setup updates
+
+- **Backend refactoring** — improved readability and handler structure
+  - `pkg/api/handlers/auth.go`: 50 lines added (login flow improvements with better error handling)
+  - `pkg/api/handlers/settings.go`: 35 lines revised (granular settings endpoint refinement)
+  - `pkg/api/handlers/evograph.go`: 4 lines revised (graph query optimization)
+  - `pkg/flow/flow.go`: 9 lines added (flow execution engine improvements)
+  - `pkg/mcp/client.go`: 225 lines added, 67 deleted (MCP HTTP client refactor for better error handling and SSE support)
+  - `pkg/mcp/manager.go`: 9 lines revised (manager health check improvements)
+  - `pkg/memory/evograph.go`: 29 lines added, 21 deleted (EvoGraph query optimization)
+  - `pkg/ws/hub.go`: 15 lines added, 8 deleted (WebSocket hub refactoring)
+  - `pkg/config/config.go`: 18 lines revised (configuration loader improvements)
+
+#### Dependencies & Configuration
+- **Environment configuration** (`.env.example`): 30 additions, 11 deletions
+  - Added new configuration variables for worker mTLS
+  - Updated provider-specific settings with new defaults
+  - Enhanced documentation for each configuration group
+
+- **Frontend package updates**
+  - `package.json`: refined dependencies and dev tool versions
+  - `package-lock.json`: updated lock file with 124 additions, 747 deletions
+
+- **Docker configuration**
+  - `backend/Dockerfile`: base image update (Go 1.24 compatibility)
+  - `frontend/Dockerfile`: optimized build stages for smaller production image
+  - `docker-compose.dev.yml`: development overrides refinement
+
+#### Documentation
+- **Architecture planning** (`.claude/plans/`)
+  - Added `mi48-design-structure-analysis.md`: new design analysis document
+  - Updated `pentagron-architecture.md`: 24 additions, 11 deletions (Phase 4 status update)
+- **Settings**: `.claude/settings.json` updated (6 additions, 1 deletion)
+- **README.md**: badge and version consistency updates (2 additions, 2 deletions)
+- **CHANGELOG.md**: 2 additions, 1 deletion (this file)
+
+#### Total Changes
+- **28 files modified**
+- **2,866 additions**
+- **2,071 deletions**
+
+### Status
+- All 5 pipeline phases remain fully operational
+- Code refactoring improves maintainability without feature breakage
+- Documentation and configuration files updated for v0.3.1 consistency
+
+---
+
 ## [0.3.0] - 2026-02-25
 
 ### Added
@@ -188,7 +249,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/heytherevibin/Pentagron/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/heytherevibin/Pentagron/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/heytherevibin/Pentagron/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/heytherevibin/Pentagron/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/heytherevibin/Pentagron/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/heytherevibin/Pentagron/releases/tag/v0.1.0
