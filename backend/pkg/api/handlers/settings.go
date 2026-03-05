@@ -259,6 +259,67 @@ func TestLLMProvider(d *Deps) gin.HandlerFunc {
 	}
 }
 
+// ── Agent Settings ────────────────────────────────────────────────────────────
+
+// GetAgentSettings returns per-agent runtime configuration.
+func GetAgentSettings(d *Deps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"maxIterations":        d.Config.AgentMaxIterations,
+			"requireApproval":      d.Config.AgentRequireApproval,
+			"evographEnabled":      d.Config.EvoGraphEnabled,
+			"vectorStoreEnabled":   d.Config.VectorStoreEnabled,
+			"summarizerLastSecBytes": d.Config.SummarizerLastSecBytes,
+			"summarizerMaxQABytes":   d.Config.SummarizerMaxQABytes,
+		})
+	}
+}
+
+// UpdateAgentSettings patches agent runtime configuration in-memory and persists to DB.
+func UpdateAgentSettings(d *Deps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var body struct {
+			MaxIterations        *int   `json:"maxIterations"`
+			RequireApproval      *bool  `json:"requireApproval"`
+			EvoGraphEnabled      *bool  `json:"evographEnabled"`
+			VectorStoreEnabled   *bool  `json:"vectorStoreEnabled"`
+			SummarizerLastSecBytes *int64 `json:"summarizerLastSecBytes"`
+			SummarizerMaxQABytes   *int64 `json:"summarizerMaxQABytes"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if body.MaxIterations != nil {
+			d.Config.AgentMaxIterations = *body.MaxIterations
+			_ = persistSetting(d, "AGENT_MAX_ITERATIONS", fmt.Sprintf("%d", *body.MaxIterations))
+		}
+		if body.RequireApproval != nil {
+			d.Config.AgentRequireApproval = *body.RequireApproval
+			_ = persistSetting(d, "AGENT_REQUIRE_APPROVAL", fmt.Sprintf("%t", *body.RequireApproval))
+		}
+		if body.EvoGraphEnabled != nil {
+			d.Config.EvoGraphEnabled = *body.EvoGraphEnabled
+			_ = persistSetting(d, "EVOGRAPH_ENABLED", fmt.Sprintf("%t", *body.EvoGraphEnabled))
+		}
+		if body.VectorStoreEnabled != nil {
+			d.Config.VectorStoreEnabled = *body.VectorStoreEnabled
+			_ = persistSetting(d, "VECTOR_STORE_ENABLED", fmt.Sprintf("%t", *body.VectorStoreEnabled))
+		}
+		if body.SummarizerLastSecBytes != nil {
+			d.Config.SummarizerLastSecBytes = *body.SummarizerLastSecBytes
+			_ = persistSetting(d, "SUMMARIZER_LAST_SEC_BYTES", fmt.Sprintf("%d", *body.SummarizerLastSecBytes))
+		}
+		if body.SummarizerMaxQABytes != nil {
+			d.Config.SummarizerMaxQABytes = *body.SummarizerMaxQABytes
+			_ = persistSetting(d, "SUMMARIZER_MAX_QA_BYTES", fmt.Sprintf("%d", *body.SummarizerMaxQABytes))
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "agent settings updated"})
+	}
+}
+
 // ── MCP Settings ─────────────────────────────────────────────────────────────
 
 // GetMCPSettings returns MCP server URLs from Config.

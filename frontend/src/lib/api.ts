@@ -98,9 +98,18 @@ export const health = {
 }
 
 // ── WebSocket URL builder ─────────────────────────────────────────────────────
-
+//
+// Browser WebSocket APIs do not support custom request headers, so the JWT must
+// be passed as a query parameter. To reduce the window of exposure, the token is
+// read fresh at connection time and is never stored in the URL itself beyond the
+// initial handshake (the connection is upgraded immediately and the URL is not
+// retained by the server after auth validation).
 export function wsUrl(path: string): string {
   const wsBase = (process.env.NEXT_PUBLIC_WS_URL ?? BASE_URL).replace(/^http/, 'ws')
-  const token = typeof window !== 'undefined' ? localStorage.getItem('pentagron_token') : ''
-  return `${wsBase}${path}?token=${token}`
+  // Prefer sessionStorage (tab-scoped, not persisted) if available.
+  const token =
+    typeof window !== 'undefined'
+      ? (sessionStorage.getItem('pentagron_token') ?? localStorage.getItem('pentagron_token') ?? '')
+      : ''
+  return `${wsBase}${path}?token=${encodeURIComponent(token)}`
 }

@@ -251,17 +251,20 @@ func ExportFlowReport(d *Deps) gin.HandlerFunc {
 
 		// Fetch actions (tool calls) for this flow
 		var actions []map[string]interface{}
-		d.DB.Raw(`
+		if err := d.DB.Raw(`
 			SELECT a.tool_name, a.input, a.output, a.success, a.duration_ms, a.created_at, t.agent_type
 			FROM actions a
 			JOIN tasks t ON t.id = a.task_id
 			WHERE t.flow_id = ? AND a.type = 'tool_call'
 			ORDER BY a.created_at ASC
-		`, flowID).Scan(&actions)
+		`, flowID).Scan(&actions).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch actions"})
+			return
+		}
 
 		// Fetch artifacts (findings) for this flow
 		var artifacts []map[string]interface{}
-		d.DB.Raw(`
+		if err := d.DB.Raw(`
 			SELECT ar.name, ar.type, ar.value, ar.severity, ar.created_at
 			FROM artifacts ar
 			JOIN actions a ON a.id = ar.action_id
@@ -277,7 +280,10 @@ func ExportFlowReport(d *Deps) gin.HandlerFunc {
 					ELSE 5
 				END ASC,
 				ar.created_at ASC
-		`, flowID).Scan(&artifacts)
+		`, flowID).Scan(&artifacts).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch artifacts"})
+			return
+		}
 
 		flowName := fmt.Sprintf("%v", flow["name"])
 		format := c.DefaultQuery("format", "markdown")

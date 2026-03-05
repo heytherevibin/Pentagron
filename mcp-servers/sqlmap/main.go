@@ -6,14 +6,77 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
+
+// reIdentifier matches safe SQL identifiers (db/table/column names).
+var reIdentifier = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
+// blockedHosts is a list of private/internal host prefixes to block SSRF.
+var blockedHosts = []string{
+	"localhost", "127.", "10.", "192.168.",
+	"172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.",
+	"172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.",
+	"172.28.", "172.29.", "172.30.", "172.31.",
+	"169.254.", "::1", "[::1]",
+}
+
+func validateURL(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fmt.Errorf("URL must not be empty")
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("malformed URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("URL scheme must be http or https, got %q", u.Scheme)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("URL must include a host")
+	}
+	host := strings.ToLower(u.Hostname())
+	for _, b := range blockedHosts {
+		if strings.HasPrefix(host, b) || host == strings.TrimSuffix(b, ".") {
+			return fmt.Errorf("target %q is a private/internal address and is not permitted (SSRF prevention)", host)
+		}
+	}
+	return nil
+}
+
+func validateIdentifier(name, label string) error {
+	if name == "" {
+		return nil
+	}
+	if len(name) > 128 {
+		return fmt.Errorf("%s too long (max 128 chars)", label)
+	}
+	if !reIdentifier.MatchString(name) {
+		return fmt.Errorf("%s must only contain alphanumeric characters and underscores", label)
+	}
+	return nil
+}
+
+func validateColumns(cols string) error {
+	if cols == "" {
+		return nil
+	}
+	for _, col := range strings.Split(cols, ",") {
+		if err := validateIdentifier(strings.TrimSpace(col), "column"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func main() {
 	port := os.Getenv("MCP_PORT")
@@ -33,20 +96,34 @@ func main() {
 		mcp.WithNumber("risk", mcp.Description("Risk level 1-3 (default 1)")),
 		mcp.WithBoolean("forms", mcp.Description("Test HTML forms automatically")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		url := req.Params.Arguments["url"].(string)
+		rawURL, ok := req.Params.Arguments["url"].(string)
+		if !ok {
+			return mcp.NewToolResultError("url parameter is required"), nil
+		}
+		if err := validateURL(rawURL); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("invalid url: %v", err)), nil
+		}
 
 		args := []string{
-			"-u", url,
-			"--batch",      // non-interactive
+			"-u", rawURL,
+			"--batch",
 			"--random-agent",
 			"--timeout=30",
 		}
 
 		if level, ok := req.Params.Arguments["level"].(float64); ok {
-			args = append(args, fmt.Sprintf("--level=%d", int(level)))
+			l := int(level)
+			if l < 1 || l > 5 {
+				return mcp.NewToolResultError("level must be between 1 and 5"), nil
+			}
+			args = append(args, fmt.Sprintf("--level=%d", l))
 		}
 		if risk, ok := req.Params.Arguments["risk"].(float64); ok {
-			args = append(args, fmt.Sprintf("--risk=%d", int(risk)))
+			r := int(risk)
+			if r < 1 || r > 3 {
+				return mcp.NewToolResultError("risk must be between 1 and 3"), nil
+			}
+			args = append(args, fmt.Sprintf("--risk=%d", r))
 		}
 		if forms, ok := req.Params.Arguments["forms"].(bool); ok && forms {
 			args = append(args, "--forms")
@@ -76,10 +153,16 @@ func main() {
 		mcp.WithString("table", mcp.Description("Target table name")),
 		mcp.WithString("columns", mcp.Description("Comma-separated column names to dump")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		url := req.Params.Arguments["url"].(string)
+		rawURL, ok := req.Params.Arguments["url"].(string)
+		if !ok {
+			return mcp.NewToolResultError("url parameter is required"), nil
+		}
+		if err := validateURL(rawURL); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("invalid url: %v", err)), nil
+		}
 
 		args := []string{
-			"-u", url,
+			"-u", rawURL,
 			"--batch",
 			"--random-agent",
 			"--timeout=60",
@@ -87,12 +170,21 @@ func main() {
 		}
 
 		if db, ok := req.Params.Arguments["db"].(string); ok && db != "" {
+			if err := validateIdentifier(db, "db"); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid db: %v", err)), nil
+			}
 			args = append(args, "-D", db)
 		}
 		if table, ok := req.Params.Arguments["table"].(string); ok && table != "" {
+			if err := validateIdentifier(table, "table"); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid table: %v", err)), nil
+			}
 			args = append(args, "-T", table)
 		}
 		if cols, ok := req.Params.Arguments["columns"].(string); ok && cols != "" {
+			if err := validateColumns(cols); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid columns: %v", err)), nil
+			}
 			args = append(args, "-C", cols)
 		}
 

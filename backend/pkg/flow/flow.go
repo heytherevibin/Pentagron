@@ -33,6 +33,10 @@ var phasesRequiringApproval = map[string]bool{
 // approvalPollInterval is how often waitForApproval checks the DB while polling.
 const approvalPollInterval = 5 * time.Second
 
+// approvalTimeout is the maximum time waitForApproval will block waiting for a human
+// decision before it automatically cancels the flow to prevent an indefinite hang.
+const approvalTimeout = 24 * time.Hour
+
 // FlowEngine executes a single Flow through its phase state machine.
 // Create one per server instance and reuse it across all flows.
 type FlowEngine struct {
@@ -241,9 +245,20 @@ func (e *FlowEngine) waitForApproval(ctx context.Context, flowID, phase, objecti
 	ticker := time.NewTicker(approvalPollInterval)
 	defer ticker.Stop()
 
+	deadline := time.NewTimer(approvalTimeout)
+	defer deadline.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
+			return context.Canceled
+		case <-deadline.C:
+			e.log.Warn("approval timed out — cancelling flow",
+				zap.String("flow_id", flowID),
+				zap.String("phase", phase),
+				zap.Duration("timeout", approvalTimeout),
+			)
+			_ = e.setFlowStatus(ctx, flowID, database.FlowStatusCancelled, phase)
 			return context.Canceled
 		case <-ch:
 			// Signal received — check DB immediately
@@ -280,18 +295,24 @@ func (e *FlowEngine) setFlowStatus(ctx context.Context, flowID string, status da
 		"phase":      phase,
 		"updated_at": time.Now(),
 	}
-	if status == database.FlowStatusRunning {
-		now := time.Now()
-		updates["started_at"] = now
-	}
 	if status == database.FlowStatusCompleted {
 		now := time.Now()
 		updates["completed_at"] = now
 	}
-	return e.db.WithContext(ctx).
+	if err := e.db.WithContext(ctx).
 		Model(&database.Flow{}).
 		Where("id = ?", flowID).
-		Updates(updates).Error
+		Updates(updates).Error; err != nil {
+		return err
+	}
+	// Set started_at only on the first transition to running (idempotent).
+	if status == database.FlowStatusRunning {
+		e.db.WithContext(ctx).Exec(
+			"UPDATE flows SET started_at = NOW() WHERE id = ? AND started_at IS NULL",
+			flowID,
+		)
+	}
+	return nil
 }
 
 // broadcastPhaseChange sends a TypePhaseChange WS event to all flow subscribers.

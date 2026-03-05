@@ -1,7 +1,7 @@
 // ── Core domain types ─────────────────────────────────────────────────────────
 
 export type FlowStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled'
-export type Phase = 'recon' | 'analysis' | 'exploitation' | 'post_exploitation' | 'report'
+export type Phase = 'recon' | 'analysis' | 'exploitation' | 'post_exploitation' | 'reporting' | 'cleanup'
 export type AttackPath = 'cve_exploit' | 'brute_force' | 'unclassified'
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 

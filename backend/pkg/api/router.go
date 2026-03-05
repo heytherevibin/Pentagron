@@ -41,7 +41,8 @@ func Setup(deps *handlers.Deps, hub *ws.Hub, corsOrigin string, log *zap.Logger)
 	// ── Auth ─────────────────────────────────────────────────────────────────
 	auth := r.Group("/api/auth")
 	{
-		auth.POST("/login", handlers.Login(deps))
+		// LoginRateLimit: token-bucket per client IP (burst 5, sustained 1 per 5s)
+		auth.POST("/login", middleware.LoginRateLimit(), handlers.Login(deps))
 		auth.POST("/logout", handlers.Logout(deps))
 	}
 
@@ -80,6 +81,10 @@ func Setup(deps *handlers.Deps, hub *ws.Hub, corsOrigin string, log *zap.Logger)
 		// Settings — General
 		api.GET("/settings/general", handlers.GetGeneralSettings(deps))
 		api.PUT("/settings/general", handlers.UpdateGeneralSettings(deps))
+
+		// Settings — Agents
+		api.GET("/settings/agents", handlers.GetAgentSettings(deps))
+		api.PUT("/settings/agents", handlers.UpdateAgentSettings(deps))
 
 		// Settings — LLM
 		api.GET("/settings/llm", handlers.GetLLMSettings(deps))

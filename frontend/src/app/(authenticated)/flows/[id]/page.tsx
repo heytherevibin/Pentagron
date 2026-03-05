@@ -136,6 +136,7 @@ export default function FlowPage() {
   const handleApprove = async (approvalId: string, notes?: string) => {
     try {
       await flowsApi.approve(id, approvalId, notes);
+      toast.success('Phase transition approved');
       fetchData();
     } catch {
       toast.error('Approval failed');
@@ -145,6 +146,7 @@ export default function FlowPage() {
   const handleReject = async (approvalId: string, notes?: string) => {
     try {
       await flowsApi.reject(id, approvalId, notes);
+      toast.success('Phase transition rejected');
       fetchData();
     } catch {
       toast.error('Rejection failed');

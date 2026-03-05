@@ -121,7 +121,10 @@ func CancelFlow(d *Deps) gin.HandlerFunc {
 			return
 		}
 		d.FlowEngine.Cancel(id)
-		d.DB.Exec("UPDATE flows SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND deleted_at IS NULL", id)
+		if result := d.DB.Exec("UPDATE flows SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND deleted_at IS NULL", id); result.Error != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{"message": "cancelled"})
 	}
 }
@@ -133,7 +136,10 @@ func ListApprovals(d *Deps) gin.HandlerFunc {
 			return
 		}
 		approvals := make([]map[string]interface{}, 0)
-		d.DB.Raw("SELECT * FROM approval_requests WHERE flow_id = ? ORDER BY created_at DESC", flowID).Scan(&approvals)
+		if err := d.DB.Raw("SELECT * FROM approval_requests WHERE flow_id = ? ORDER BY created_at DESC", flowID).Scan(&approvals).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, approvals)
 	}
 }
@@ -152,8 +158,11 @@ func ApprovePhase(d *Deps) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		d.DB.Exec("UPDATE approval_requests SET status = 'approved', reviewed_at = NOW(), notes = ? WHERE id = ? AND flow_id = ?",
-			body.Notes, body.ApprovalID, flowID)
+		if result := d.DB.Exec("UPDATE approval_requests SET status = 'approved', reviewed_at = NOW(), notes = ? WHERE id = ? AND flow_id = ?",
+			body.Notes, body.ApprovalID, flowID); result.Error != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+			return
+		}
 		d.FlowEngine.NotifyApproval(flowID)
 		c.JSON(http.StatusOK, gin.H{"message": "approved"})
 	}

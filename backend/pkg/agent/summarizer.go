@@ -110,13 +110,16 @@ HISTORY:
 	return resp.Content, nil
 }
 
-// totalBytes estimates the byte size of all message content.
+// totalBytes estimates the byte size of all message content, including role
+// labels, tool call IDs, tool names, and inputs. This gives a more accurate
+// picture of actual context size and ensures summarization triggers before
+// the context window is exhausted.
 func totalBytes(messages []llm.Message) int64 {
 	var total int64
 	for _, m := range messages {
-		total += int64(len(m.Content))
+		total += int64(len(m.Role)) + int64(len(m.Content)) + int64(len(m.ToolCallID))
 		for _, tc := range m.ToolCalls {
-			total += int64(len(tc.Input))
+			total += int64(len(tc.ID)) + int64(len(tc.Name)) + int64(len(tc.Input))
 		}
 	}
 	return total

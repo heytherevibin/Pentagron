@@ -47,7 +47,9 @@ function LoginForm() {
       localStorage.setItem('pentagron_token', token)
       document.cookie = `pentagron_token=${token}; path=/; SameSite=Lax`
 
-      const redirect = searchParams.get('redirect') || '/'
+      // Validate redirect is a local path to prevent open-redirect attacks.
+      const raw = searchParams.get('redirect') ?? '/'
+      const redirect = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
       router.push(redirect)
     } catch {
       setError('ACCESS DENIED')

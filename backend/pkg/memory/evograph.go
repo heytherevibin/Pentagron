@@ -105,11 +105,8 @@ func (e *EvoGraph) StartChain(ctx context.Context, sessionID, projectID, objecti
 // RecordStep records a reasoning step (thought) in the chain.
 func (e *EvoGraph) RecordStep(ctx context.Context, sessionID, content string, iteration int) {
 	id := uuid.New().String()
-	e.append(sessionID, chainEntry{
-		ID: id, Type: "step", Content: content, CreatedAt: time.Now(),
-	})
-
-	e.writeNode(ctx, "ChainStep", sessionID, map[string]interface{}{
+	entry := chainEntry{ID: id, Type: "step", Content: content, CreatedAt: time.Now()}
+	e.writeAndAppend(ctx, "ChainStep", sessionID, entry, map[string]interface{}{
 		"id":         id,
 		"session_id": sessionID,
 		"content":    truncate(content, 2000),
@@ -121,13 +118,8 @@ func (e *EvoGraph) RecordStep(ctx context.Context, sessionID, content string, it
 // RecordFinding records a successful discovery (credential, vuln, service).
 func (e *EvoGraph) RecordFinding(ctx context.Context, sessionID, toolName, output string) {
 	id := uuid.New().String()
-	entry := chainEntry{
-		ID: id, Type: "finding", Tool: toolName,
-		Content: output, Severity: SeverityInfo, CreatedAt: time.Now(),
-	}
-	e.append(sessionID, entry)
-
-	e.writeNode(ctx, "ChainFinding", sessionID, map[string]interface{}{
+	entry := chainEntry{ID: id, Type: "finding", Tool: toolName, Content: output, Severity: SeverityInfo, CreatedAt: time.Now()}
+	e.writeAndAppend(ctx, "ChainFinding", sessionID, entry, map[string]interface{}{
 		"id":         id,
 		"session_id": sessionID,
 		"tool":       toolName,
@@ -140,12 +132,8 @@ func (e *EvoGraph) RecordFinding(ctx context.Context, sessionID, toolName, outpu
 // RecordFindingWithSeverity records a finding with explicit severity.
 func (e *EvoGraph) RecordFindingWithSeverity(ctx context.Context, sessionID, toolName, output string, severity Severity) {
 	id := uuid.New().String()
-	e.append(sessionID, chainEntry{
-		ID: id, Type: "finding", Tool: toolName,
-		Content: output, Severity: severity, CreatedAt: time.Now(),
-	})
-
-	e.writeNode(ctx, "ChainFinding", sessionID, map[string]interface{}{
+	entry := chainEntry{ID: id, Type: "finding", Tool: toolName, Content: output, Severity: severity, CreatedAt: time.Now()}
+	e.writeAndAppend(ctx, "ChainFinding", sessionID, entry, map[string]interface{}{
 		"id":         id,
 		"session_id": sessionID,
 		"tool":       toolName,
@@ -159,9 +147,8 @@ func (e *EvoGraph) RecordFindingWithSeverity(ctx context.Context, sessionID, too
 func (e *EvoGraph) RecordDecision(ctx context.Context, sessionID, rationale, fromPhase, toPhase string) {
 	id := uuid.New().String()
 	content := fmt.Sprintf("Phase transition %s→%s: %s", fromPhase, toPhase, rationale)
-	e.append(sessionID, chainEntry{ID: id, Type: "decision", Content: content, CreatedAt: time.Now()})
-
-	e.writeNode(ctx, "ChainDecision", sessionID, map[string]interface{}{
+	entry := chainEntry{ID: id, Type: "decision", Content: content, CreatedAt: time.Now()}
+	e.writeAndAppend(ctx, "ChainDecision", sessionID, entry, map[string]interface{}{
 		"id":         id,
 		"session_id": sessionID,
 		"rationale":  rationale,
@@ -175,12 +162,8 @@ func (e *EvoGraph) RecordDecision(ctx context.Context, sessionID, rationale, fro
 func (e *EvoGraph) RecordFailure(ctx context.Context, sessionID, toolName, errorMsg string) {
 	id := uuid.New().String()
 	lesson := fmt.Sprintf("Tool %q failed: %s — avoid repeating this approach.", toolName, truncate(errorMsg, 200))
-	e.append(sessionID, chainEntry{
-		ID: id, Type: "failure", Tool: toolName,
-		Content: errorMsg, Lesson: lesson, CreatedAt: time.Now(),
-	})
-
-	e.writeNode(ctx, "ChainFailure", sessionID, map[string]interface{}{
+	entry := chainEntry{ID: id, Type: "failure", Tool: toolName, Content: errorMsg, Lesson: lesson, CreatedAt: time.Now()}
+	e.writeAndAppend(ctx, "ChainFailure", sessionID, entry, map[string]interface{}{
 		"id":             id,
 		"session_id":     sessionID,
 		"tool":           toolName,
@@ -281,23 +264,46 @@ func (e *EvoGraph) append(sessionID string, entry chainEntry) {
 	e.chains[sessionID] = append(e.chains[sessionID], entry)
 }
 
-func (e *EvoGraph) writeNode(ctx context.Context, label, sessionID string, props map[string]interface{}) {
+// allowedLabels is the whitelist of valid EvoGraph node type labels.
+// Using a whitelist prevents Cypher injection through the label parameter.
+var allowedLabels = map[string]bool{
+	"ChainStep":     true,
+	"ChainFinding":  true,
+	"ChainDecision": true,
+	"ChainFailure":  true,
+}
+
+// writeAndAppend writes the node to Neo4j first, then — only on success — appends
+// it to the in-memory slice. This keeps both stores consistent: if the Neo4j write
+// fails the in-memory state is not advanced, preventing silent divergence.
+func (e *EvoGraph) writeAndAppend(ctx context.Context, label, sessionID string, entry chainEntry, props map[string]interface{}) {
+	if !allowedLabels[label] {
+		e.log.Error("evograph: rejected unknown node label — possible injection attempt",
+			zap.String("label", label),
+		)
+		return
+	}
+
 	session := e.neo4j.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
-	// Build Cypher props string dynamically
 	query := fmt.Sprintf("CREATE (n:%s $props) WITH n MATCH (c:AttackChain {session_id: $session_id}) CREATE (c)-[:HAS_NODE]->(n)", label)
 	_, err := session.Run(ctx, query, map[string]interface{}{
 		"props":      props,
 		"session_id": sessionID,
 	})
 	if err != nil {
-		e.log.Warn("evograph: write node failed",
+		e.log.Warn("evograph: write node failed — in-memory state NOT updated to stay consistent",
 			zap.String("label", label),
 			zap.Error(err),
 		)
+		return
 	}
+
+	// Only append to in-memory after the persistent write succeeds.
+	e.append(sessionID, entry)
 }
+
 
 func truncate(s string, max int) string {
 	if len(s) <= max {

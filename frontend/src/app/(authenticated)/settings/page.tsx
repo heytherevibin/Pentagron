@@ -43,8 +43,8 @@ interface AgentSettings {
   requireApproval: boolean
   evographEnabled: boolean
   vectorStoreEnabled: boolean
-  summarizerMaxInputBytes: number
-  summarizerMaxOutputBytes: number
+  summarizerLastSecBytes: number
+  summarizerMaxQABytes: number
 }
 
 interface MCPServer {
@@ -320,8 +320,8 @@ export default function SettingsPage() {
     requireApproval: true,
     evographEnabled: true,
     vectorStoreEnabled: true,
-    summarizerMaxInputBytes: 51200,
-    summarizerMaxOutputBytes: 65536,
+    summarizerLastSecBytes: 51200,
+    summarizerMaxQABytes: 65536,
   })
 
   // ── MCP state ──────────────────────────────────────────────────────────────
@@ -356,10 +356,10 @@ export default function SettingsPage() {
       const data = res.data?.data ?? res.data
       if (data) {
         setGeneral({
-          defaultProvider: data.default_provider ?? 'anthropic',
-          defaultModel: data.default_model ?? 'claude-sonnet-4-20250514',
-          autoApproval: data.auto_approval ?? false,
-          maxIterations: data.max_iterations ?? 25,
+          defaultProvider: data.defaultProvider ?? data.default_provider ?? 'anthropic',
+          defaultModel: data.defaultModel ?? data.default_model ?? 'claude-sonnet-4-20250514',
+          autoApproval: data.autoApproval ?? data.auto_approval ?? false,
+          maxIterations: data.maxIterations ?? data.max_iterations ?? 25,
         })
       }
       setServerStatus('ok')
@@ -373,30 +373,31 @@ export default function SettingsPage() {
     try {
       const res = await api.get('/api/settings/llm')
       const data = res.data?.data ?? res.data
-      if (data?.providers && Array.isArray(data.providers)) {
+      // Backend returns providers as an object map: { anthropic: {...}, openai: {...} }
+      if (data?.providers && typeof data.providers === 'object' && !Array.isArray(data.providers)) {
+        const provMap = data.providers as Record<string, Record<string, string>>
         setProviders((prev) =>
           prev.map((p) => {
-            const remote = data.providers.find((r: Record<string, unknown>) => r.name === p.name)
+            const remote = provMap[p.name]
             if (remote) {
               return {
                 ...p,
-                apiKey: (remote.api_key as string) ?? '',
-                baseUrl: (remote.base_url as string) ?? p.baseUrl,
-                status: (remote.status as DotStatus) ?? 'offline',
+                apiKey: remote.apiKey ?? '',
+                baseUrl: remote.baseURL ?? p.baseUrl,
               }
             }
             return p
           })
         )
       }
-      if (data?.agent_overrides && Array.isArray(data.agent_overrides)) {
+      // Backend returns agentModels as an object map: { orchestrator: "...", pentester: "..." }
+      if (data?.agentModels && typeof data.agentModels === 'object') {
+        const modelMap = data.agentModels as Record<string, string>
         setAgentOverrides(
-          AGENT_TYPES.map((a) => {
-            const found = data.agent_overrides.find(
-              (o: Record<string, unknown>) => (o.agent as string)?.toLowerCase() === a.toLowerCase()
-            )
-            return { agent: a, model: (found?.model as string) ?? '' }
-          })
+          AGENT_TYPES.map((a) => ({
+            agent: a,
+            model: modelMap[a.toLowerCase()] ?? '',
+          }))
         )
       }
     } catch {
@@ -410,12 +411,12 @@ export default function SettingsPage() {
       const data = res.data?.data ?? res.data
       if (data) {
         setAgentSettings({
-          maxIterations: data.max_iterations ?? 25,
-          requireApproval: data.require_approval ?? true,
-          evographEnabled: data.evograph_enabled ?? true,
-          vectorStoreEnabled: data.vector_store_enabled ?? true,
-          summarizerMaxInputBytes: data.summarizer_max_input_bytes ?? 51200,
-          summarizerMaxOutputBytes: data.summarizer_max_output_bytes ?? 65536,
+          maxIterations: data.maxIterations ?? 25,
+          requireApproval: data.requireApproval ?? true,
+          evographEnabled: data.evographEnabled ?? true,
+          vectorStoreEnabled: data.vectorStoreEnabled ?? true,
+          summarizerLastSecBytes: data.summarizerLastSecBytes ?? 51200,
+          summarizerMaxQABytes: data.summarizerMaxQABytes ?? 65536,
         })
       }
     } catch {
@@ -427,18 +428,14 @@ export default function SettingsPage() {
     try {
       const res = await api.get('/api/settings/mcp')
       const data = res.data?.data ?? res.data
-      if (data?.servers && Array.isArray(data.servers)) {
+      // Backend returns servers as an object map: { naabu: "url", sqlmap: "url" }
+      if (data?.servers && typeof data.servers === 'object' && !Array.isArray(data.servers)) {
+        const svrMap = data.servers as Record<string, string>
         setMcpServers((prev) =>
           prev.map((s) => {
-            const remote = data.servers.find(
-              (r: Record<string, unknown>) => (r.name as string)?.toLowerCase() === s.name.toLowerCase()
-            )
-            if (remote) {
-              return {
-                ...s,
-                url: (remote.url as string) ?? s.url,
-                status: (remote.status as DotStatus) ?? 'offline',
-              }
+            const remoteUrl = svrMap[s.name.toLowerCase()]
+            if (remoteUrl) {
+              return { ...s, url: remoteUrl }
             }
             return s
           })
@@ -451,9 +448,9 @@ export default function SettingsPage() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await api.get('/api/settings/users')
+      const res = await api.get('/api/users')
       const data = res.data?.data ?? res.data
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setUsers(
           data.map((u: Record<string, unknown>) => ({
             id: u.id as string,
@@ -461,18 +458,19 @@ export default function SettingsPage() {
             role: (u.role as UserRecord['role']) ?? 'viewer',
             projects: (u.projects as number) ?? 0,
             lastLogin: (u.last_login as string) ?? '',
-            status: (u.status as 'active' | 'inactive') ?? 'active',
+            status: (u.active === false ? 'inactive' : 'active') as 'active' | 'inactive',
           }))
         )
       }
     } catch {
-      // use mock data
+      // keep existing list on error
     }
   }, [])
 
   const fetchHealth = useCallback(async () => {
     try {
-      const [provRes, mcpRes] = await Promise.allSettled([
+      const [allRes, provRes, mcpRes] = await Promise.allSettled([
+        api.get('/api/health/all'),
         api.get('/api/health/providers'),
         api.get('/api/health/mcp'),
       ])
@@ -500,40 +498,26 @@ export default function SettingsPage() {
             )
           : DEFAULT_MCP_SERVERS.map((s) => ({ name: s.name, status: 'offline' as DotStatus }))
 
-      // Check databases and docker — attempt individual endpoints or use mock
-      let databases: HealthService[] = []
+      // Use /api/health/all for database and docker status
+      let databases: HealthService[] = [
+        { name: 'PostgreSQL', status: 'offline' },
+        { name: 'Neo4j', status: 'offline' },
+        { name: 'Redis', status: 'offline' },
+      ]
       let docker: HealthService = { name: 'Kali Sandbox', status: 'offline' }
 
-      try {
-        const dbRes = await api.get('/api/health/databases')
-        const dbData = dbRes.data?.data ?? dbRes.data
-        if (Array.isArray(dbData)) {
-          databases = dbData.map((d: Record<string, unknown>) => ({
-            name: d.name as string,
-            status: (d.status as DotStatus) ?? 'offline',
-            latency: d.latency_ms as number | undefined,
-          }))
+      if (allRes.status === 'fulfilled') {
+        const allData = allRes.value.data?.data ?? allRes.value.data
+        if (allData?.database) {
+          const dbStatus = (allData.database.status as DotStatus) ?? 'offline'
+          databases = [{ name: 'PostgreSQL', status: dbStatus }]
         }
-      } catch {
-        databases = [
-          { name: 'PostgreSQL', status: 'offline' },
-          { name: 'Neo4j', status: 'offline' },
-          { name: 'Redis', status: 'offline' },
-        ]
-      }
-
-      try {
-        const dkRes = await api.get('/api/health/docker')
-        const dkData = dkRes.data?.data ?? dkRes.data
-        if (dkData) {
+        if (allData?.docker) {
           docker = {
             name: 'Kali Sandbox',
-            status: (dkData.status as DotStatus) ?? 'offline',
-            latency: dkData.latency_ms as number | undefined,
+            status: (allData.docker.status as DotStatus) === 'ok' ? 'ok' : 'offline',
           }
         }
-      } catch {
-        // keep offline default
       }
 
       setHealthData({ llmProviders: llmProviders, mcpServers: mcpSvcs, databases, docker })
@@ -578,10 +562,10 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       await api.put('/api/settings/general', {
-        default_provider: general.defaultProvider,
-        default_model: general.defaultModel,
-        auto_approval: general.autoApproval,
-        max_iterations: general.maxIterations,
+        defaultProvider: general.defaultProvider,
+        defaultModel: general.defaultModel,
+        autoApproval: general.autoApproval,
+        maxIterations: general.maxIterations,
       })
       toast.success('General settings saved')
     } catch {
@@ -594,18 +578,20 @@ export default function SettingsPage() {
   async function saveLLM() {
     setSaving(true)
     try {
+      // Backend expects providers as an object map and agentModels as an object map
+      const providersMap: Record<string, { apiKey: string; baseURL: string }> = {}
+      for (const p of providers) {
+        providersMap[p.name] = { apiKey: p.apiKey, baseURL: p.baseUrl }
+      }
+      const agentModelsMap: Record<string, string> = {}
+      for (const o of agentOverrides) {
+        if (o.model.trim()) {
+          agentModelsMap[o.agent.toLowerCase()] = o.model.trim()
+        }
+      }
       await api.put('/api/settings/llm', {
-        providers: providers.map((p) => ({
-          name: p.name,
-          api_key: p.apiKey,
-          base_url: p.baseUrl,
-        })),
-        agent_overrides: agentOverrides
-          .filter((o) => o.model.trim())
-          .map((o) => ({
-            agent: o.agent.toLowerCase(),
-            model: o.model.trim(),
-          })),
+        providers: providersMap,
+        agentModels: agentModelsMap,
       })
       toast.success('LLM settings saved')
     } catch {
@@ -619,12 +605,12 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       await api.put('/api/settings/agents', {
-        max_iterations: agentSettings.maxIterations,
-        require_approval: agentSettings.requireApproval,
-        evograph_enabled: agentSettings.evographEnabled,
-        vector_store_enabled: agentSettings.vectorStoreEnabled,
-        summarizer_max_input_bytes: agentSettings.summarizerMaxInputBytes,
-        summarizer_max_output_bytes: agentSettings.summarizerMaxOutputBytes,
+        maxIterations: agentSettings.maxIterations,
+        requireApproval: agentSettings.requireApproval,
+        evographEnabled: agentSettings.evographEnabled,
+        vectorStoreEnabled: agentSettings.vectorStoreEnabled,
+        summarizerLastSecBytes: agentSettings.summarizerLastSecBytes,
+        summarizerMaxQABytes: agentSettings.summarizerMaxQABytes,
       })
       toast.success('Agent settings saved')
     } catch {
@@ -637,13 +623,12 @@ export default function SettingsPage() {
   async function saveMCP() {
     setSaving(true)
     try {
-      await api.put('/api/settings/mcp', {
-        servers: mcpServers.map((s) => ({
-          name: s.name,
-          url: s.url,
-          port: s.port,
-        })),
-      })
+      // Backend expects servers as an object map: { naabu: "url", sqlmap: "url" }
+      const serversMap: Record<string, string> = {}
+      for (const s of mcpServers) {
+        serversMap[s.name.toLowerCase()] = s.url
+      }
+      await api.put('/api/settings/mcp', { servers: serversMap })
       toast.success('MCP settings saved')
     } catch {
       toast.error('Failed to save MCP settings')
@@ -679,10 +664,8 @@ export default function SettingsPage() {
       prev.map((s) => (s.name === serverName ? { ...s, testing: true } : s))
     )
     try {
-      const server = mcpServers.find((s) => s.name === serverName)
       const res = await api.post(`/api/settings/mcp/test`, {
-        name: serverName,
-        url: server?.url,
+        server: serverName.toLowerCase(),
       })
       const data = res.data?.data ?? res.data
       const status: DotStatus = data?.status === 'ok' ? 'ok' : 'error'
@@ -705,13 +688,10 @@ export default function SettingsPage() {
     if (!inviteEmail.trim()) return
     setInviting(true)
     try {
-      await api.post('/api/settings/users/invite', {
+      await api.post('/api/users', {
         email: inviteEmail.trim(),
+        password: crypto.randomUUID(), // temporary password; user should reset via email
         role: inviteRole,
-        projects: inviteProjects
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
       })
       toast.success(`Invited ${inviteEmail}`)
       setUsers((prev) => [
@@ -738,7 +718,7 @@ export default function SettingsPage() {
 
   async function handleUpdateUserRole(userId: string, role: UserRecord['role']) {
     try {
-      await api.put(`/api/settings/users/${userId}/role`, { role })
+      await api.put(`/api/users/${userId}`, { role })
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)))
       toast.success('Role updated')
     } catch {
@@ -750,7 +730,7 @@ export default function SettingsPage() {
     if (!deactivateTarget) return
     setDeactivating(true)
     try {
-      await api.post(`/api/settings/users/${deactivateTarget.id}/deactivate`)
+      await api.delete(`/api/users/${deactivateTarget.id}`)
       setUsers((prev) =>
         prev.map((u) => (u.id === deactivateTarget.id ? { ...u, status: 'inactive' } : u))
       )
@@ -1031,35 +1011,35 @@ export default function SettingsPage() {
         <Panel title="SUMMARIZER LIMITS">
           <div className="space-y-5">
             <Input
-              label="MAX INPUT BYTES"
+              label="LAST SEC BYTES (summarize threshold)"
               type="number"
               min={1024}
-              value={agentSettings.summarizerMaxInputBytes}
+              value={agentSettings.summarizerLastSecBytes}
               onChange={(e) =>
                 setAgentSettings((s) => ({
                   ...s,
-                  summarizerMaxInputBytes: Math.max(1024, parseInt(e.target.value) || 1024),
+                  summarizerLastSecBytes: Math.max(1024, parseInt(e.target.value) || 1024),
                 }))
               }
             />
             <p className="text-xxs font-mono text-mc-text-ghost -mt-3">
-              {(agentSettings.summarizerMaxInputBytes / 1024).toFixed(0)} KB
+              {(agentSettings.summarizerLastSecBytes / 1024).toFixed(0)} KB
             </p>
 
             <Input
-              label="MAX OUTPUT BYTES"
+              label="MAX QA BYTES (aggressive summarize)"
               type="number"
               min={1024}
-              value={agentSettings.summarizerMaxOutputBytes}
+              value={agentSettings.summarizerMaxQABytes}
               onChange={(e) =>
                 setAgentSettings((s) => ({
                   ...s,
-                  summarizerMaxOutputBytes: Math.max(1024, parseInt(e.target.value) || 1024),
+                  summarizerMaxQABytes: Math.max(1024, parseInt(e.target.value) || 1024),
                 }))
               }
             />
             <p className="text-xxs font-mono text-mc-text-ghost -mt-3">
-              {(agentSettings.summarizerMaxOutputBytes / 1024).toFixed(0)} KB
+              {(agentSettings.summarizerMaxQABytes / 1024).toFixed(0)} KB
             </p>
           </div>
         </Panel>

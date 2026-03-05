@@ -37,6 +37,7 @@ type ToolResult struct {
 // AgentResult is the final output of a completed ReAct loop.
 type AgentResult struct {
 	SessionID     string
+	ChainID       string // EvoGraph AttackChain node ID for cross-session linking
 	FinalAnswer   string
 	Steps         []Step
 	TotalDuration time.Duration
@@ -136,9 +137,9 @@ func (a *ReActAgent) Run(ctx context.Context, task string) (*AgentResult, error)
 		{Role: llm.RoleUser, Content: task},
 	}
 
-	// Record chain start in EvoGraph
+	// Record chain start in EvoGraph; returned in AgentResult so callers can link
+	// the flow DB record to the EvoGraph AttackChain node for cross-session queries.
 	chainID := a.evograph.StartChain(ctx, a.cfg.SessionID, a.cfg.ProjectID, task)
-	_ = chainID
 
 	// Get tool definitions scoped to current phase
 	toolDefs := a.registry.ToolDefinitions(a.cfg.AgentType)
@@ -146,6 +147,13 @@ func (a *ReActAgent) Run(ctx context.Context, task string) (*AgentResult, error)
 	var finalAnswer string
 
 	for i := 0; i < a.cfg.MaxIterations; i++ {
+		// Exit immediately if the context has been cancelled (flow cancelled, server shutdown).
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		step := Step{Iteration: i + 1, Timestamp: time.Now()}
 
 		req := llm.ChatRequest{
@@ -242,6 +250,7 @@ func (a *ReActAgent) Run(ctx context.Context, task string) (*AgentResult, error)
 done:
 	return &AgentResult{
 		SessionID:     a.cfg.SessionID,
+		ChainID:       chainID,
 		FinalAnswer:   finalAnswer,
 		Steps:         a.steps,
 		TotalDuration: time.Since(start),

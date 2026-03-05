@@ -39,6 +39,7 @@ type Client struct {
 	sessionID string
 	flowID    string
 	send      chan []byte
+	closeOnce sync.Once // ensures send is closed exactly once
 	hub       *Hub
 	log       *zap.Logger
 }
@@ -48,6 +49,23 @@ type Hub struct {
 	mu      sync.RWMutex
 	clients map[string]map[*Client]bool // flowID → clients
 	log     *zap.Logger
+}
+
+// safeSend attempts a non-blocking send to ch, recovering from a panic if the
+// channel has already been closed by Unregister. Returns false if the send
+// could not complete (channel full or closed).
+func safeSend(ch chan []byte, b []byte) (sent bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			sent = false
+		}
+	}()
+	select {
+	case ch <- b:
+		return true
+	default:
+		return false
+	}
 }
 
 // NewHub creates a new WebSocket hub.
@@ -72,17 +90,20 @@ func (h *Hub) Register(c *Client) {
 	)
 }
 
-// Unregister removes a client from the hub.
+// Unregister removes a client from the hub. Safe to call multiple times
+// (both ReadPump and WritePump defer Unregister; sync.Once prevents double-close).
 func (h *Hub) Unregister(c *Client) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	if clients, ok := h.clients[c.flowID]; ok {
 		delete(clients, c)
 		if len(clients) == 0 {
 			delete(h.clients, c.flowID)
 		}
 	}
-	close(c.send)
+	h.mu.Unlock()
+	// Close the send channel exactly once, regardless of how many goroutines
+	// call Unregister (ReadPump and WritePump both defer it).
+	c.closeOnce.Do(func() { close(c.send) })
 }
 
 // Broadcast sends a message to all clients subscribed to a flow.
@@ -94,15 +115,20 @@ func (h *Hub) Broadcast(flowID string, msg Message) {
 		return
 	}
 
+	// Snapshot the client set under the lock so that concurrent Register /
+	// Unregister calls cannot mutate the map while we iterate over it.
 	h.mu.RLock()
-	clients := h.clients[flowID]
+	snapshot := make([]*Client, 0, len(h.clients[flowID]))
+	for c := range h.clients[flowID] {
+		snapshot = append(snapshot, c)
+	}
 	h.mu.RUnlock()
 
-	for c := range clients {
-		select {
-		case c.send <- b:
-		default:
-			h.log.Warn("ws client send buffer full, dropping message",
+	for _, c := range snapshot {
+		// safeSend recovers from a panic caused by sending on a closed channel
+		// (possible if Unregister races with Broadcast after snapshot is taken).
+		if !safeSend(c.send, b) {
+			h.log.Warn("ws client send buffer full or closed, dropping message",
 				zap.String("session", c.sessionID))
 		}
 	}

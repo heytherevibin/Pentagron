@@ -52,7 +52,17 @@
       "Bash(winget install --id GitHub.cli --silent)",
       "Bash(winget source reset --force)",
       "Bash(npm run lint)",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(wc -l \"C:\\\\Users\\\\MATHEV03\\\\Downloads\\\\Code\\\\pegatron\\\\frontend\\\\src\\\\app\\\\\\(authenticated\\)\\\\settings\\\\page.tsx\")",
+      "Bash(xargs wc -l)",
+      "Bash(find /c/Users/MATHEV03/Downloads/Code/pegatron/mcp-servers -name \"*.go\" -type f -exec echo \"=== {} ===\" ; -exec wc -l {} ;)",
+      "Bash(npm run type-check)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(ls -la /c/Users/MATHEV03/Downloads/Code/pegatron/backend/pkg/api/handlers/*.go)",
+      "Bash(xargs grep -l \"ApprovePhase\\\\|RejectPhase\")",
+      "Bash(xargs grep -l \"GetFlowGraph\\\\|ExportFlowReport\")",
+      "Bash(ls -lh \"C:\\\\Users\\\\MATHEV03\\\\Downloads\\\\Code\\\\pegatron\\\\frontend\\\\src\\\\app\\\\\\(authenticated\\)\\\\flows\"\")",
+      "Bash(find \"C:\\\\Users\\\\MATHEV03\\\\Downloads\\\\Code\\\\pegatron\\\\frontend\\\\src\\\\app\\\\\\(authenticated\\)\\\\flows\" -name \"*.tsx\" -type f)"
     ]
   }
 }

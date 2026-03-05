@@ -29,7 +29,7 @@ const PHASE_STYLES: Record<string, string> = {
   analysis:           'bg-indigo-950/50 text-indigo-400',
   exploitation:       'bg-red-950/50 text-mc-crimson',
   post_exploitation:  'bg-amber-950/50 text-mc-amber',
-  report:             'bg-emerald-950/50 text-mc-emerald',
+  reporting:          'bg-emerald-950/50 text-mc-emerald',
   cleanup:            'bg-slate-800/60 text-slate-400',
 }
 
