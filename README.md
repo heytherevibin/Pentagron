@@ -6,6 +6,7 @@
 
 **Production-grade, fully automated security assessment platform powered by multi-agent AI orchestration**
 
+[![Release v0.3.1](https://img.shields.io/badge/Release-v0.3.1-blue.svg)](https://github.com/heytherevibin/Pentagron/releases/tag/v0.3.1)
 [![CI](https://github.com/heytherevibin/Pentagron/actions/workflows/ci.yml/badge.svg)](https://github.com/heytherevibin/Pentagron/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org)
@@ -23,6 +24,8 @@
 ## Overview
 
 Pentagron is an enterprise-grade, fully autonomous penetration testing framework that orchestrates AI agents through a structured five-phase offensive pipeline — from passive reconnaissance through post-exploitation reporting. Built entirely in Go with a Next.js frontend, it combines multi-agent specialisation with evolutionary graph-based memory to deliver consistent, auditable, and context-aware security assessments.
+
+**Current Status**: v0.3.1 (Feb 28, 2026) — All 5 pipeline phases complete with code refactoring for improved maintainability. Ready for production deployment.
 
 ### Problem Statement
 
@@ -498,160 +501,39 @@ make logs-backend   # Tail backend logs only
 make migrate        # Run database migrations
 make db-shell       # Open psql interactive shell
 make neo4j-shell    # Open Neo4j cypher-shell
-make test           # Run Go tests with race detector
-make test-cover     # Run tests and open HTML coverage report
-make lint           # Run golangci-lint
-make fmt            # Format all Go code
-make tidy           # Run go mod tidy
-make clean          # Remove containers and volumes — DESTRUCTIVE
-make env-setup      # Copy .env.example → .env (non-destructive)
 ```
-
----
-
-## Project Structure
-
-```
-pentagron/
-├── CLAUDE.md                        # Claude Code project instructions
-├── CHANGELOG.md                     # Version history (Keep a Changelog format)
-├── LICENSE                          # MIT License
-├── Makefile                         # Developer workflow — 20+ targets
-├── README.md                        # This file
-├── .env.example                     # Environment configuration template
-├── .gitignore
-├── docker-compose.yml               # Core services (10 containers)
-├── docker-compose.dev.yml           # Hot-reload overrides
-├── docker-compose.observability.yml # Grafana + Langfuse
-│
-├── .claude/                         # Claude Code intelligence (version-controlled)
-│   ├── settings.local.json          # Permission configuration
-│   ├── memory/MEMORY.md             # Project memory
-│   └── plans/                       # Architecture plans archive
-│
-├── backend/                         # Go monolith
-│   ├── cmd/server/main.go           # Server entrypoint — wires all deps
-│   ├── cmd/worker/main.go           # Air-gapped worker node
-│   └── pkg/
-│       ├── agent/                   # ReAct loop, Reflector, Summarizer
-│       ├── api/                     # Gin router, handlers, JWT middleware
-│       ├── config/                  # Viper typed configuration
-│       ├── database/                # GORM models (9 entities), Postgres, Neo4j
-│       ├── docker/                  # Kali sandbox exec client
-│       ├── flow/                    # Flow/Task orchestration engine
-│       ├── llm/                     # Multi-provider LLM abstraction (5 providers)
-│       ├── mcp/                     # MCP HTTP/SSE client + manager
-│       ├── memory/                  # EvoGraph (Neo4j) + pgvector semantic store
-│       ├── recon/                   # Six-phase recon pipeline orchestrator
-│       ├── templates/prompts/       # Agent prompt templates (pentester, recon, coder, reporter, orchestrator)
-│       ├── tools/                   # Tool registry + executor (MCP + shell)
-│       └── ws/                      # WebSocket hub — broadcast + guidance injection
-│
-├── frontend/                        # Next.js 15 + TypeScript
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── login/               # Public login page
-│   │   │   ├── setup/               # First-run setup wizard
-│   │   │   └── (authenticated)/     # Protected route group
-│   │   │       ├── layout.tsx       # TopNav + CommandPalette wrapper
-│   │   │       ├── page.tsx         # Dashboard (stats + projects + activity)
-│   │   │       ├── projects/new/    # Create project
-│   │   │       ├── projects/[id]/   # Project detail + flows
-│   │   │       ├── flows/[id]/      # Flow mission control (3-panel)
-│   │   │       └── settings/        # Admin panel (6 tabs)
-│   │   ├── components/              # 17 UI primitives + 3 composites
-│   │   ├── hooks/                   # useAgentWebSocket
-│   │   ├── lib/api.ts               # Typed Axios client with JWT interceptors
-│   │   └── types/index.ts           # Shared domain types
-│   ├── public/
-│   │   ├── manifest.json            # PWA manifest
-│   │   ├── sw.js                    # Service worker
-│   │   └── icons/                   # PWA icons (SVG)
-│   ├── middleware.ts                 # Cookie-based auth route protection
-│   └── Dockerfile
-│
-├── mcp-servers/                     # Go MCP server binaries
-│   ├── naabu/                       # Port scanning — :8000
-│   ├── sqlmap/                      # SQL injection — :8001
-│   ├── nuclei/                      # Vulnerability scanning — :8002
-│   └── metasploit/                  # Exploitation — :8003
-│
-└── docker/
-    ├── kali/Dockerfile              # 200+ tool Kali Linux image
-    └── postgres/init.sql            # pgvector + uuid-ossp initialisation
-```
-
----
-
-## Security & Legal
-
-### Authorised Use Only
-
-Pentagron is a powerful offensive security tool. **You must have explicit, written authorisation before running any assessment against any system or network.**
-
-Unauthorised access to computer systems is illegal under, among others:
-
-- **United States** — Computer Fraud and Abuse Act (18 U.S.C. § 1030)
-- **United Kingdom** — Computer Misuse Act 1990
-- **European Union** — Directive 2013/40/EU on Attacks Against Information Systems
-- **International** — Budapest Convention on Cybercrime
-
-The authors and contributors of Pentagron accept no liability for any misuse of this software.
-
-### Deployment Hardening
-
-- Change `ADMIN_PASSWORD` and `JWT_SECRET` before any non-local deployment
-- The Docker socket mount grants elevated host access — deploy only on trusted infrastructure
-- Do not expose port 8080 to untrusted networks without a TLS-terminating reverse proxy (nginx, Caddy, Traefik)
-- Enable network policies to restrict inter-container communication beyond what Compose defines
-- Store `.env` outside the repository — it is listed in `.gitignore`
-
-### Responsible Disclosure
-
-If you discover a security vulnerability in Pentagron itself, please report it privately via [GitHub Security Advisories](https://github.com/heytherevibin/Pentagron/security/advisories/new) rather than opening a public issue.
 
 ---
 
 ## Contributing
 
-Contributions are welcome. Please follow these guidelines.
+Contributions are welcome. Please ensure:
 
-### Branch Strategy
+1. All tests pass: `make test && make test-e2e`
+2. Linting passes: `make lint`
+3. Code builds clean: `go build ./...` and `npm run build`
+4. New features include tests and documentation updates
 
-| Branch | Purpose |
-|--------|---------|
-| `main` | Stable releases only — protected |
-| `develop` | Integration branch — base for all PRs |
-| `feature/*` | New features — branch from `develop` |
-| `fix/*` | Bug fixes — branch from `develop` or `main` |
-| `docs/*` | Documentation only |
+See [CHANGELOG.md](CHANGELOG.md) for version history and [.claude/plans/pentagron-architecture.md](.claude/plans/pentagron-architecture.md) for architectural decisions.
 
-### Pull Request Process
+---
 
-1. Fork the repository and create your branch from `develop`
-2. Ensure `make test` passes (zero failures, zero race conditions)
-3. Ensure `make lint` passes (zero errors)
-4. Update `CHANGELOG.md` under `[Unreleased]`
-5. Open a pull request against `develop` with a clear description of the change and its motivation
-6. Maintainers will review within 5 business days
+## Security & Legal
 
-### Code Standards
+**Pentagron is designed for authorised security testing only.**
 
-- **Go** — `gofmt` formatted; `golangci-lint` clean; all errors handled explicitly
-- **TypeScript** — strict mode enabled; no untyped `any` without justification comment
-- **Commits** — Conventional Commits format: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`
-- **Security** — No secrets, hard-coded IPs, or domain names in source code
+Use of this software for unauthorized access to computer systems is illegal. Always:
+
+- Obtain explicit written permission before testing any system you do not own
+- Comply with all applicable laws and regulations (CFAA, GDPR, etc.)
+- Respect data privacy and confidentiality
+- Report findings responsibly to affected parties
+- Do not cause damage or disruption
+
+The authors assume no liability for misuse or damage caused by this software.
 
 ---
 
 ## License
 
-Copyright © 2025 Pentagron Contributors
-
-Released under the [MIT License](LICENSE). See `LICENSE` for the full text including the authorised-use-only notice.
-
----
-
-<div align="center">
-<sub>Built for security professionals who demand precision, repeatability, and speed.</sub>
-</div>
+MIT License — see [LICENSE](LICENSE) for details.
