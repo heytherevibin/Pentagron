@@ -28,7 +28,6 @@ export function CommandPalette() {
   const listRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
-  // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -40,7 +39,6 @@ export function CommandPalette() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  // Reset state when dialog opens
   useEffect(() => {
     if (open) {
       setQuery('')
@@ -48,12 +46,10 @@ export function CommandPalette() {
     }
   }, [open])
 
-  // Filter items with simple fuzzy matching
   const filtered = COMMANDS.filter(item =>
     item.label.toLowerCase().includes(query.toLowerCase())
   )
 
-  // Group by category
   const grouped = filtered.reduce<Record<string, CommandItem[]>>((acc, item) => {
     if (!acc[item.category]) acc[item.category] = []
     acc[item.category].push(item)
@@ -73,7 +69,6 @@ export function CommandPalette() {
     }
   }, [router])
 
-  // Keyboard navigation within results
   const onInputKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -89,7 +84,6 @@ export function CommandPalette() {
     }
   }, [flatFiltered, activeIndex, executeItem])
 
-  // Keep active item in view
   useEffect(() => {
     const list = listRef.current
     if (!list) return
@@ -104,14 +98,14 @@ export function CommandPalette() {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm" />
         <Dialog.Content
-          className="fixed top-[20%] left-1/2 z-50 w-full max-w-lg -translate-x-1/2 bg-mc-surface border border-mc-border shadow-2xl focus:outline-none"
+          className="fixed top-[20%] left-1/2 z-50 w-full max-w-lg -translate-x-1/2 bg-surface-1 border border-border shadow-2xl focus:outline-none"
           onOpenAutoFocus={(e) => {
             e.preventDefault()
             inputRef.current?.focus()
           }}
         >
           {/* Search input */}
-          <div className="border-b border-mc-border p-3">
+          <div className="border-b border-border p-3">
             <input
               ref={inputRef}
               type="text"
@@ -122,7 +116,7 @@ export function CommandPalette() {
               }}
               onKeyDown={onInputKeyDown}
               placeholder="Type a command..."
-              className="w-full bg-mc-bg border border-mc-border px-3 py-2 text-sm font-mono text-mc-text placeholder:text-mc-text-ghost focus:border-mc-emerald focus:outline-none"
+              className="w-full bg-background border border-border px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted focus:border-blue-500/50 focus:outline-none"
               autoComplete="off"
               spellCheck={false}
             />
@@ -131,13 +125,13 @@ export function CommandPalette() {
           {/* Results */}
           <div ref={listRef} className="max-h-[400px] overflow-y-auto p-2">
             {flatFiltered.length === 0 ? (
-              <div className="px-3 py-6 text-center text-mc-text-ghost text-xs font-mono">
-                NO RESULTS
+              <div className="px-3 py-6 text-center text-muted text-xs font-mono">
+                No results
               </div>
             ) : (
               Object.entries(grouped).map(([category, items]) => (
                 <div key={category} className="mb-2 last:mb-0">
-                  <div className="px-3 py-1.5 text-xxs font-mono font-medium uppercase tracking-widest-plus text-mc-text-muted">
+                  <div className="px-3 py-1.5 text-[10px] font-mono font-medium uppercase tracking-widest-plus text-muted">
                     {category}
                   </div>
                   {items.map((item) => {
@@ -149,13 +143,13 @@ export function CommandPalette() {
                         onClick={() => executeItem(item)}
                         onMouseEnter={() => setActiveIndex(globalIndex)}
                         className={cn(
-                          'w-full text-left px-3 py-2 text-sm font-mono text-mc-text-dim cursor-pointer transition-colors',
-                          globalIndex === activeIndex && 'bg-mc-surface-hover text-mc-text',
+                          'w-full text-left px-3 py-2 text-sm font-mono text-muted cursor-pointer transition-colors',
+                          globalIndex === activeIndex && 'bg-surface-2 text-foreground',
                         )}
                       >
                         {item.label}
                         {item.href && (
-                          <span className="ml-2 text-xxs text-mc-text-ghost">{item.href}</span>
+                          <span className="ml-2 text-[10px] text-muted">{item.href}</span>
                         )}
                       </button>
                     )
@@ -166,15 +160,15 @@ export function CommandPalette() {
           </div>
 
           {/* Footer hint */}
-          <div className="border-t border-mc-border px-3 py-2 flex items-center justify-between">
-            <span className="text-xxs font-mono text-mc-text-ghost">
+          <div className="border-t border-border px-3 py-2 flex items-center justify-between">
+            <span className="text-[10px] font-mono text-muted">
               ESC to close
             </span>
-            <span className="text-xxs font-mono text-mc-text-ghost">
-              <span className="px-1 py-0.5 border border-mc-border text-mc-text-muted mr-1">&uarr;</span>
-              <span className="px-1 py-0.5 border border-mc-border text-mc-text-muted mr-1">&darr;</span>
+            <span className="text-[10px] font-mono text-muted">
+              <span className="px-1 py-0.5 border border-border mr-1">&uarr;</span>
+              <span className="px-1 py-0.5 border border-border mr-1">&darr;</span>
               navigate
-              <span className="ml-2 px-1 py-0.5 border border-mc-border text-mc-text-muted">&#9166;</span>
+              <span className="ml-2 px-1 py-0.5 border border-border">&#9166;</span>
               {' '}select
             </span>
           </div>

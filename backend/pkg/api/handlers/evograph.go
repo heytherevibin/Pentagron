@@ -46,12 +46,12 @@ func GetFlowGraph(d *Deps) gin.HandlerFunc {
 			return
 		}
 
-		// Look up the session's neo4j chain ID from the sessions table
+		// Look up sessions for this flow (GORM column for Neo4jChain is neo4j_chain)
 		var sessions []struct {
-			ID         string `json:"id"`
-			Neo4jChain string `json:"neo4j_chain_id"`
+			ID         string
+			Neo4jChain string
 		}
-		if err := d.DB.Raw("SELECT id, neo4j_chain_id FROM sessions WHERE flow_id = ? ORDER BY created_at DESC", flowID).Scan(&sessions).Error; err != nil || len(sessions) == 0 {
+		if err := d.DB.Raw("SELECT id, neo4j_chain FROM sessions WHERE flow_id = ? ORDER BY created_at DESC", flowID).Scan(&sessions).Error; err != nil || len(sessions) == 0 {
 			// No sessions yet — return empty graph
 			c.JSON(http.StatusOK, gin.H{"nodes": []graphNode{}, "edges": []graphEdge{}})
 			return

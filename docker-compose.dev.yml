@@ -21,7 +21,7 @@ services:
       - /app/.next
     environment:
       - NODE_ENV=development
-    command: ["npm", "run", "dev"]
+    command: ["sh", "-c", "npm ci && npm run dev"]
 
   postgres:
     ports:

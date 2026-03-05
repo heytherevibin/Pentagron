@@ -42,6 +42,7 @@ type Client struct {
 	closeOnce sync.Once // ensures send is closed exactly once
 	hub       *Hub
 	log       *zap.Logger
+	closeOnce sync.Once
 }
 
 // Hub manages all active WebSocket connections and broadcasts messages.
@@ -90,8 +91,13 @@ func (h *Hub) Register(c *Client) {
 	)
 }
 
+<<<<<<< HEAD
 // Unregister removes a client from the hub. Safe to call multiple times
 // (both ReadPump and WritePump defer Unregister; sync.Once prevents double-close).
+=======
+// Unregister removes a client from the hub. Safe to call multiple times.
+// Does not close the client's send channel; the client must do that exactly once.
+>>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
 func (h *Hub) Unregister(c *Client) {
 	h.mu.Lock()
 	if clients, ok := h.clients[c.flowID]; ok {
@@ -100,10 +106,13 @@ func (h *Hub) Unregister(c *Client) {
 			delete(h.clients, c.flowID)
 		}
 	}
+<<<<<<< HEAD
 	h.mu.Unlock()
 	// Close the send channel exactly once, regardless of how many goroutines
 	// call Unregister (ReadPump and WritePump both defer it).
 	c.closeOnce.Do(func() { close(c.send) })
+=======
+>>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
 }
 
 // Broadcast sends a message to all clients subscribed to a flow.
@@ -146,13 +155,22 @@ func NewClient(conn *websocket.Conn, sessionID, flowID string, hub *Hub, log *za
 	}
 }
 
+// close ensures send channel is closed once, unregisters from hub, and closes the conn.
+// Safe to call from both ReadPump and WritePump; only the first call does the work.
+func (c *Client) close() {
+	c.closeOnce.Do(func() {
+		close(c.send)
+		c.hub.Unregister(c)
+		_ = c.conn.Close()
+	})
+}
+
 // WritePump pumps messages from the send channel to the WebSocket connection.
 func (c *Client) WritePump() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
-		c.hub.Unregister(c)
+		c.close()
 	}()
 
 	for {
@@ -178,10 +196,7 @@ func (c *Client) WritePump() {
 
 // ReadPump reads incoming messages (guidance injection, approvals) from the client.
 func (c *Client) ReadPump() {
-	defer func() {
-		c.hub.Unregister(c)
-		c.conn.Close()
-	}()
+	defer c.close()
 
 	c.conn.SetReadLimit(64 * 1024)
 	_ = c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))

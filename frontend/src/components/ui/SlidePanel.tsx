@@ -48,17 +48,17 @@ export function SlidePanel({
       {/* Panel */}
       <div
         className={cn(
-          'fixed top-0 right-0 z-50 h-full bg-mc-surface border-l border-mc-border flex flex-col transition-transform duration-200 ease-in-out',
+          'fixed top-0 right-0 z-50 h-full bg-surface-1 border-l border-border flex flex-col transition-transform duration-200 ease-in-out',
           width,
           open ? 'translate-x-0' : 'translate-x-full',
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-mc-border shrink-0">
+        <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <DataLabel>{title}</DataLabel>
           <button
             onClick={onClose}
-            className="text-mc-text-ghost hover:text-mc-text transition-colors font-mono text-sm p-1"
+            className="text-muted hover:text-foreground transition-colors font-mono text-sm p-1"
             aria-label="Close panel"
           >
             &#x2715;

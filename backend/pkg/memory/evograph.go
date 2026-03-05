@@ -77,27 +77,29 @@ func (e *EvoGraph) StartChain(ctx context.Context, sessionID, projectID, objecti
 	e.chains[sessionID] = []chainEntry{}
 	e.mu.Unlock()
 
-	session := e.neo4j.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(ctx)
+	if e.neo4j != nil {
+		session := e.neo4j.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		defer session.Close(ctx)
 
-	_, err := session.Run(ctx, `
-		CREATE (c:AttackChain {
-			id: $id,
-			session_id: $session_id,
-			project_id: $project_id,
-			objective: $objective,
-			created_at: $created_at
-		})`,
-		map[string]interface{}{
-			"id":         chainID,
-			"session_id": sessionID,
-			"project_id": projectID,
-			"objective":  objective,
-			"created_at": time.Now().UTC().Format(time.RFC3339),
-		},
-	)
-	if err != nil {
-		e.log.Warn("evograph: failed to create AttackChain", zap.Error(err))
+		_, err := session.Run(ctx, `
+			CREATE (c:AttackChain {
+				id: $id,
+				session_id: $session_id,
+				project_id: $project_id,
+				objective: $objective,
+				created_at: $created_at
+			})`,
+			map[string]interface{}{
+				"id":         chainID,
+				"session_id": sessionID,
+				"project_id": projectID,
+				"objective":  objective,
+				"created_at": time.Now().UTC().Format(time.RFC3339),
+			},
+		)
+		if err != nil {
+			e.log.Warn("evograph: failed to create AttackChain", zap.Error(err))
+		}
 	}
 	return chainID
 }
@@ -231,6 +233,9 @@ func (e *EvoGraph) FormatContext(ctx context.Context) string {
 
 // QueryPriorChains retrieves successful findings from prior sessions for the same project.
 func (e *EvoGraph) queryPriorChains(ctx context.Context) string {
+	if e.neo4j == nil {
+		return ""
+	}
 	session := e.neo4j.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
@@ -264,6 +269,7 @@ func (e *EvoGraph) append(sessionID string, entry chainEntry) {
 	e.chains[sessionID] = append(e.chains[sessionID], entry)
 }
 
+<<<<<<< HEAD
 // allowedLabels is the whitelist of valid EvoGraph node type labels.
 // Using a whitelist prevents Cypher injection through the label parameter.
 var allowedLabels = map[string]bool{
@@ -284,6 +290,12 @@ func (e *EvoGraph) writeAndAppend(ctx context.Context, label, sessionID string, 
 		return
 	}
 
+=======
+func (e *EvoGraph) writeNode(ctx context.Context, label, sessionID string, props map[string]interface{}) {
+	if e.neo4j == nil {
+		return
+	}
+>>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
 	session := e.neo4j.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 

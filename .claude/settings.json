@@ -34,7 +34,12 @@
       "Bash(cat \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/flows/[id]/page.tsx\")",
       "Bash(cat \"/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/\\(authenticated\\)/page.tsx\")",
       "Bash(grep -n \"c.Get\\\\|user_id\\\\|user_email\\\\|user_role\" /Users/heytherevibin/Downloads/code/Pentagron/backend/pkg/api/handlers/*.go)",
-      "Bash(wc -l /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/**/*.tsx /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/**/*.ts)"
+      "Bash(wc -l /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/**/*.tsx /Users/heytherevibin/Downloads/code/Pentagron/frontend/src/**/*.ts)",
+      "Bash(npm install @ant-design/icons framer-motion)",
+      "Bash(ls /Users/heytherevibin/Downloads/code/Pentagron/frontend/*.ts /Users/heytherevibin/Downloads/code/Pentagron/frontend/*.js /Users/heytherevibin/Downloads/code/Pentagron/frontend/*.mjs /Users/heytherevibin/Downloads/code/Pentagron/frontend/*.json)",
+      "Bash(find /Users/heytherevibin/go/pkg/mod/github.com/mark3labs/mcp-go* -type f -name \"*.go\")",
+      "Bash(go test ./pkg/mcp/... -v -count=1)",
+      "Bash(go test ./... -count=1 -short)"
     ],
     "additionalDirectories": [
       "/Users/heytherevibin/Downloads/code/Pentagron/frontend/src/app/projects/[id]",

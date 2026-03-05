@@ -6,7 +6,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/pentagron/pentagron/pkg/database"
 )
 
 func Login(d *Deps) gin.HandlerFunc {
@@ -93,14 +96,56 @@ func CreateProject(d *Deps) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		ownerID, _ := c.Get("user_id")
-		var newID string
-		if err := d.DB.Raw("INSERT INTO projects (id, name, description, owner_id, scope, created_at, updated_at) VALUES (gen_random_uuid(), ?, ?, ?, ?, NOW(), NOW()) RETURNING id",
-			body.Name, body.Description, ownerID, body.Scope).Scan(&newID).Error; err != nil {
+		ownerIDVal, ok := c.Get("user_id")
+		if !ok || ownerIDVal == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			return
+		}
+		var ownerID uuid.UUID
+		switch v := ownerIDVal.(type) {
+		case string:
+			var err error
+			ownerID, err = uuid.Parse(v)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+				return
+			}
+		case float64:
+			// JWT numeric claims can unmarshal as float64
+			ownerID = uuid.Nil
+			// Re-fetch from DB by email if we only have a numeric sub (legacy)
+			emailVal, _ := c.Get("user_email")
+			if emailStr, ok := emailVal.(string); ok && emailStr != "" {
+				var u struct{ ID uuid.UUID }
+				if d.DB.Raw("SELECT id FROM users WHERE email = ? AND deleted_at IS NULL", emailStr).Scan(&u).Error == nil {
+					ownerID = u.ID
+				}
+			}
+			if ownerID == uuid.Nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+				return
+			}
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+			return
+		}
+		// Ensure user still exists (e.g. after DB reset) to avoid FK violation
+		var exists int64
+		if d.DB.Model(&database.User{}).Where("id = ? AND deleted_at IS NULL", ownerID).Count(&exists).Error != nil || exists == 0 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "session invalid, please log in again"})
+			return
+		}
+		proj := database.Project{
+			Name:        body.Name,
+			Description: body.Description,
+			Scope:       body.Scope,
+			OwnerID:     ownerID,
+		}
+		if err := d.DB.Create(&proj).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusCreated, gin.H{"id": newID, "message": "project created"})
+		c.JSON(http.StatusCreated, gin.H{"id": proj.ID.String(), "message": "project created"})
 	}
 }
 

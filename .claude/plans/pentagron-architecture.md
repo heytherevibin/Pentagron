@@ -2,7 +2,7 @@
 
 **Created**: 2025-02-24
 **Updated**: 2026-02-25
-**Status**: Phase 3 complete — backend + frontend (Mission Control UI) + security hardening all built
+**Status**: Phase 4 complete — all pipeline phases shipped including observability, testing, worker nodes, and mTLS
 
 ---
 
@@ -203,13 +203,26 @@ Design system: JetBrains Mono, mc-* palette, dot-grid background, 2px corners, e
 | 1 | Infrastructure scaffold (Docker, Makefiles, configs) | Done |
 | 2 | Backend implementation (agent, LLM, tools, API, flow engine) | Done |
 | 3 | Frontend Mission Control UI + security hardening | Done |
-| 4 | Integration testing + observability | Next |
+| 4 | Integration testing, observability, worker nodes, mTLS | Done |
 
-## Remaining Work
-1. Boot all containers and smoke test (`make up`)
-2. End-to-end integration test (login → project → flow → approve → report)
-3. EvoGraph read API endpoint for real-time graph visualization
-4. PDF report export (backend-generated with Pentagron branding)
-5. Grafana dashboard templates for agent metrics
-6. Langfuse tracing integration
-7. Air-gapped worker node mutual TLS
+### Phase 4 Deliverables (all shipped)
+- EvoGraph read API (`GET /flows/:id/graph`) — Neo4j Cypher → D3 JSON
+- PDF/JSON/Markdown report export (`GET /flows/:id/report?format=`)
+- Grafana auto-provisioned dashboards (8 panels, PostgreSQL datasource)
+- Langfuse tracing (batched HTTP client, wired into `llm.Manager.Chat()`)
+- Handler integration tests (12 tests, SQLite in-memory)
+- E2E integration tests (7 tests, build tag `integration`)
+- Unit tests (manager, reflector, langfuse)
+- Worker node HTTP protocol (register/poll/result)
+- Mutual TLS for worker ↔ server (`pkg/mtls`, TLS 1.3)
+- Post-exploitation agent phase + prompt template
+- GitHub Actions CI (Go build+test, frontend lint+build, golangci-lint)
+- PowerShell make wrapper (`make.ps1`)
+- ESLint flat config for frontend
+
+## Next Steps
+1. `make env-setup && make up` — boot all containers and smoke test
+2. `make test-e2e` — run e2e integration tests against live stack
+3. Production hardening — rate limiting, request body size limits, CSP headers
+4. RBAC expansion — project-scoped operator/viewer roles with `user_projects` table
+5. Helm chart or Kubernetes manifests for cloud deployment

@@ -60,8 +60,8 @@ export const flows = {
   graph: (id: string) => api.get(`/api/flows/${id}/graph`),
   report: (id: string, format: 'markdown' | 'json' = 'json') =>
     api.get(`/api/flows/${id}/report`, { params: { format } }),
-  reportDownload: (id: string) =>
-    api.get(`/api/flows/${id}/report`, { responseType: 'blob' }),
+  reportDownload: (id: string, format: 'markdown' | 'pdf' = 'markdown') =>
+    api.get(`/api/flows/${id}/report`, { params: { format }, responseType: 'blob' }),
 }
 
 export const models = {
@@ -106,10 +106,16 @@ export const health = {
 // retained by the server after auth validation).
 export function wsUrl(path: string): string {
   const wsBase = (process.env.NEXT_PUBLIC_WS_URL ?? BASE_URL).replace(/^http/, 'ws')
+<<<<<<< HEAD
   // Prefer sessionStorage (tab-scoped, not persisted) if available.
   const token =
     typeof window !== 'undefined'
       ? (sessionStorage.getItem('pentagron_token') ?? localStorage.getItem('pentagron_token') ?? '')
       : ''
   return `${wsBase}${path}?token=${encodeURIComponent(token)}`
+=======
+  const token = typeof window !== 'undefined' ? localStorage.getItem('pentagron_token') : ''
+  const separator = path.includes('?') ? '&' : '?'
+  return `${wsBase}${path}${separator}token=${token}`
+>>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
 }

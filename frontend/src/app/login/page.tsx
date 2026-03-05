@@ -3,7 +3,6 @@
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { auth, api } from '@/lib/api'
-import { Panel } from '@/components/ui/Panel'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { GlowDot } from '@/components/ui/GlowDot'
@@ -17,14 +16,12 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [systemOnline, setSystemOnline] = useState<boolean | null>(null)
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (typeof window !== 'undefined' && localStorage.getItem('pentagron_token')) {
       router.push('/')
     }
   }, [router])
 
-  // Check system health on mount
   useEffect(() => {
     api.get('/health')
       .then(() => setSystemOnline(true))
@@ -59,26 +56,90 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-[420px] space-y-6">
-        {/* Title area */}
-        <div className="text-center space-y-1">
-          <h1 className="text-xl font-bold font-mono text-mc-emerald">[PENTAGRON]</h1>
-          <div className="text-xxs font-mono font-medium uppercase tracking-widest-plus text-mc-text-muted">
-            MISSION CONTROL
+    <div className="auth-layout">
+      {/* Brand panel (left) */}
+      <div className="auth-brand">
+        <div className="auth-brand-waves" />
+
+        <div className="relative z-10">
+          <div className="flex items-center gap-3">
+            <span className="text-blue-500 text-2xl font-bold tracking-tight">[P]</span>
+            <span className="text-foreground text-lg font-semibold tracking-tight">PENTAGRON</span>
           </div>
-          <div className="text-mc-text-ghost text-xxs font-mono">v0.1.0</div>
+          <p className="text-muted text-xs mt-1">Autonomous Penetration Testing Framework</p>
         </div>
 
-        {/* Login card */}
-        <Panel title="AUTHENTICATION" className="w-full">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="bg-mc-crimson/10 border border-mc-crimson/40 p-3">
-                <span className="text-mc-crimson text-xs font-mono font-bold">{error}</span>
-              </div>
-            )}
+        <div className="relative z-10 space-y-6">
+          <div>
+            <div className="w-12 h-[2px] bg-blue-500 mb-4" />
+            <h2 className="text-foreground text-xl font-semibold tracking-tight leading-tight">
+              AI-Powered Offensive
+              <br />
+              Security Operations
+            </h2>
+            <p className="text-muted text-xs mt-3 max-w-md leading-relaxed">
+              Automated reconnaissance, vulnerability discovery, exploitation,
+              and post-exploitation with full audit trails and phase-gated approvals.
+            </p>
+          </div>
+        </div>
 
+        <div className="relative z-10 flex items-center gap-2">
+          <GlowDot
+            status={systemOnline === null ? 'offline' : systemOnline ? 'ok' : 'error'}
+            size="sm"
+          />
+          <span className="text-muted text-[10px] uppercase tracking-widest-plus">
+            {systemOnline === null
+              ? 'Checking system...'
+              : systemOnline
+                ? 'System Online'
+                : 'System Offline'}
+          </span>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="auth-divider" />
+
+      {/* Auth form (right) */}
+      <div className="auth-main">
+        <div className="auth-form-wrap space-y-8">
+          {/* System status (mobile only) */}
+          <div className="flex items-center gap-2 lg:hidden">
+            <GlowDot
+              status={systemOnline === null ? 'offline' : systemOnline ? 'ok' : 'error'}
+              size="sm"
+            />
+            <span className="text-muted text-[10px] uppercase tracking-widest-plus">
+              {systemOnline === null
+                ? 'Checking...'
+                : systemOnline
+                  ? 'System Online'
+                  : 'System Offline'}
+            </span>
+          </div>
+
+          {/* Header */}
+          <div>
+            <p className="text-muted text-[10px] uppercase tracking-widest-plus mb-3">Sign In</p>
+            <h1 className="text-foreground text-lg font-semibold tracking-tight">
+              Authenticate to continue
+            </h1>
+            <p className="text-muted text-xs mt-1">
+              Enter your operator credentials
+            </p>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="bg-red-500/5 border border-red-500/20 p-3">
+              <span className="text-red-400 text-xs font-mono font-bold">{error}</span>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
             <Input
               label="OPERATOR ID"
               type="email"
@@ -103,26 +164,16 @@ function LoginForm() {
               type="submit"
               variant="primary"
               loading={loading}
-              className="w-full"
+              className="w-full h-9"
             >
-              AUTHENTICATE
+              Authenticate
             </Button>
           </form>
-        </Panel>
 
-        {/* System status */}
-        <div className="flex items-center justify-center gap-2">
-          <GlowDot
-            status={systemOnline === null ? 'offline' : systemOnline ? 'ok' : 'error'}
-            size="sm"
-          />
-          <span className="text-xxs font-mono uppercase tracking-widest-plus text-mc-text-muted">
-            {systemOnline === null
-              ? 'CHECKING SYSTEM...'
-              : systemOnline
-                ? 'SYSTEM ONLINE'
-                : 'SYSTEM OFFLINE'}
-          </span>
+          {/* Footer */}
+          <p className="text-muted text-[10px] text-center">
+            Pentagron v0.1.0
+          </p>
         </div>
       </div>
     </div>
@@ -132,8 +183,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <span className="text-mc-text-ghost text-xs font-mono animate-blink">LOADING...</span>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <span className="text-muted text-xs font-mono animate-pulse">Loading...</span>
       </div>
     }>
       <LoginForm />

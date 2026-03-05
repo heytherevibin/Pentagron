@@ -12,9 +12,9 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { PhaseProgress } from '@/components/ui/PhaseProgress'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Skeleton } from '@/components/ui/Skeleton'
+import { ProjectDetailPageSkeleton } from '@/components/ui/Skeleton'
+import { PageContentShell } from '@/components/layout/PageContentShell'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 function formatDate(iso: string): string {
@@ -48,7 +48,6 @@ export default function ProjectDetailPage() {
   const [formData, setFormData] = useState({ name: '', objective: '' })
   const [creating, setCreating] = useState(false)
 
-  // Delete confirmation state (future use)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -108,59 +107,67 @@ export default function ProjectDetailPage() {
     }
   }
 
-  // Loading skeleton
   if (loading) {
-    return (
-      <div className="p-6 space-y-6">
-        <Skeleton variant="card" className="h-16" />
-        <Skeleton variant="card" className="h-64" />
-      </div>
-    )
+    return <ProjectDetailPageSkeleton />
   }
 
-  return (
-    <div className="p-6 space-y-6">
-      {/* ── Project Info ─────────────────────────────────────────────── */}
-      <Panel title={project?.name ?? 'PROJECT'}>
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
-          <div className="flex items-center gap-2">
-            <DataLabel>SCOPE</DataLabel>
-            <span className="text-sm font-mono text-mc-text-dim">
-              {project?.scope || '--'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <DataLabel>CREATED</DataLabel>
-            <span className="text-sm font-mono text-mc-text-dim">
-              {project?.created_at ? formatDate(project.created_at) : '--'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <DataLabel>OWNER</DataLabel>
-            <span className="text-sm font-mono text-mc-text-dim">
-              {project?.owner_id || '--'}
-            </span>
-          </div>
-        </div>
-      </Panel>
+  const projectName = project?.name ?? 'Project'
 
-      {/* ── Engagement Flows ─────────────────────────────────────────── */}
-      <Panel
-        title="ENGAGEMENT FLOWS"
-        headerRight={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowForm((prev) => !prev)}
-          >
-            {showForm ? 'CANCEL' : '+ NEW FLOW'}
-          </Button>
-        }
-      >
-        {/* Inline create form */}
-        {showForm && (
-          <form onSubmit={handleCreateFlow} className="mb-4">
-            <Panel variant="inset">
+  return (
+    <PageContentShell>
+      <div className="animate-fade-in space-y-6">
+        {/* Breadcrumb + page title — matches flow page and dashboard */}
+        <nav className="flex items-center gap-1.5 text-xs font-mono text-muted">
+          <Link href="/" className="hover:text-foreground transition-colors">
+            Dashboard
+          </Link>
+          <span aria-hidden>/</span>
+          <span className="text-foreground">{projectName}</span>
+        </nav>
+        <div>
+          <h1 className="page-title">{projectName}</h1>
+          <p className="page-subtitle">Engagement overview</p>
+        </div>
+
+        <Panel title="PROJECT INFO">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="space-y-1">
+              <DataLabel>SCOPE</DataLabel>
+              <p className="text-sm font-mono text-foreground break-words">
+                {project?.scope || '—'}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <DataLabel>CREATED</DataLabel>
+              <p className="text-sm font-mono text-foreground">
+                {project?.created_at ? formatDate(project.created_at) : '—'}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <DataLabel>FLOWS</DataLabel>
+              <p className="text-sm font-mono text-foreground">
+                {flowList.length}
+              </p>
+            </div>
+          </div>
+        </Panel>
+
+        {/* Engagement Flows */}
+        <Panel
+          title="ENGAGEMENT FLOWS"
+          headerRight={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowForm((prev) => !prev)}
+            >
+              {showForm ? 'Cancel' : '+ New Flow'}
+            </Button>
+          }
+        >
+          {/* Inline create form */}
+          {showForm && (
+            <form onSubmit={handleCreateFlow} className="mb-4 p-4 bg-surface-2 border border-border">
               <div className="space-y-4">
                 <Input
                   label="FLOW NAME"
@@ -180,7 +187,7 @@ export default function ProjectDetailPage() {
                   }
                   placeholder="Identify external attack surface and exploitable vulnerabilities..."
                 />
-                <div className="flex items-center justify-end gap-3 pt-2 border-t border-mc-border">
+                <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
                   <Button
                     type="button"
                     variant="ghost"
@@ -202,22 +209,41 @@ export default function ProjectDetailPage() {
                   </Button>
                 </div>
               </div>
-            </Panel>
-          </form>
-        )}
+            </form>
+          )}
 
-        {/* Flow list */}
-        {flowList.length === 0 ? (
-          <EmptyState
-            title="NO FLOWS INITIALIZED"
-            description="create an engagement flow to begin autonomous pentesting"
-            action={
-              !showForm ? (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setShowForm(true)}
+          {flowList.length === 0 ? (
+            <EmptyState
+              title="No flows initialized"
+              description="Create an engagement flow to begin autonomous pentesting"
+              action={
+                !showForm ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setShowForm(true)}
+                  >
+                    + New Flow
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <div>
+              <div className="grid grid-cols-[minmax(0,2fr)_auto_auto_minmax(0,1.5fr)_auto] gap-3 px-4 py-2.5 border-b border-border">
+                <span className="panel-header-text">Flow</span>
+                <span className="panel-header-text">Status</span>
+                <span className="panel-header-text">Phase</span>
+                <span className="panel-header-text">Objective</span>
+                <span className="panel-header-text">Created</span>
+              </div>
+              {flowList.map((flow) => (
+                <Link
+                  key={flow.id}
+                  href={`/flows/${flow.id}`}
+                  className="grid grid-cols-[minmax(0,2fr)_auto_auto_minmax(0,1.5fr)_auto] gap-3 px-4 py-3 border-b border-border last:border-b-0 hover:bg-surface-2 transition-colors cursor-pointer items-center"
                 >
+<<<<<<< HEAD
                   + NEW FLOW
                 </Button>
               ) : undefined
@@ -234,8 +260,28 @@ export default function ProjectDetailPage() {
               <DataLabel>PROGRESS</DataLabel>
               <DataLabel>TIME</DataLabel>
               <DataLabel></DataLabel>
+=======
+                  <span className="text-sm font-mono text-foreground truncate">
+                    {flow.name}
+                  </span>
+                  <StatusBadge variant="flow" status={flow.status} />
+                  <span className="text-[10px] font-mono uppercase text-muted tracking-wider whitespace-nowrap">
+                    {flow.phase?.replace(/_/g, ' ') ?? '—'}
+                  </span>
+                  <span className="text-xs font-mono text-muted truncate">
+                    {truncate(flow.objective ?? '', 50)}
+                  </span>
+                  <span className="text-[10px] font-mono text-muted whitespace-nowrap">
+                    {formatTimestamp(flow.created_at)}
+                  </span>
+                </Link>
+              ))}
+>>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
             </div>
+          )}
+        </Panel>
 
+<<<<<<< HEAD
             {/* Flow rows */}
             {flowList.map((flow) => (
               <div
@@ -281,14 +327,28 @@ export default function ProjectDetailPage() {
 
       {/* ── Delete Confirm Dialog ───────────────────────────────────── */}
       <ConfirmDialog
+=======
+        {/* Delete Confirm Dialog */}
+        <ConfirmDialog
+>>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="DELETE FLOW"
         description="This will permanently destroy the flow and all associated data. This action cannot be undone."
         variant="danger"
         confirmLabel="DELETE"
+<<<<<<< HEAD
         onConfirm={handleDeleteFlow}
       />
     </div>
+=======
+        onConfirm={() => {
+          setDeleteOpen(false)
+          setDeleteTarget(null)
+        }}
+        />
+      </div>
+    </PageContentShell>
+>>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
   )
 }

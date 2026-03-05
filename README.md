@@ -84,7 +84,7 @@ Manual penetration testing is slow, inconsistent, and does not scale. Experience
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
 ║   ┌─────────────────┐          ┌───────────────────────────────────────┐    ║
-║   │  NEXT.JS 16 UI  │  WS/REST │         GO BACKEND (GIN)              │    ║
+║   │  NEXT.JS 15 UI  │  WS/REST │         GO BACKEND (GIN)              │    ║
 ║   │                 │◄────────►│                                       │    ║
 ║   │  • Dashboard    │          │  ┌─────────────┐  ┌───────────────┐  │    ║
 ║   │  • Graph View   │          │  │ ORCHESTRATOR│  │ FLOW ENGINE   │  │    ║
@@ -161,7 +161,7 @@ The orchestrator classifies each objective into one of three attack paths at ses
 
 | Component | Technology | Version |
 |-----------|-----------|---------|
-| Backend language | Go | 1.23+ |
+| Backend language | Go | 1.24+ |
 | HTTP framework | Gin | 1.10 |
 | ORM | GORM | 1.25 |
 | LLM — Anthropic | anthropic-sdk-go | 0.2.0-alpha |

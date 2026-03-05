@@ -17,8 +17,8 @@ interface ConfirmDialogProps {
 }
 
 const BORDER_VARIANT: Record<string, string> = {
-  danger:  'border-mc-crimson',
-  warning: 'border-mc-amber',
+  danger:  'border-red-500/40',
+  warning: 'border-amber-500/40',
 }
 
 export function ConfirmDialog({
@@ -38,24 +38,24 @@ export function ConfirmDialog({
         <Dialog.Content
           className={cn(
             'fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2',
-            'bg-mc-surface border',
+            'bg-surface-1 border',
             BORDER_VARIANT[variant],
           )}
           onInteractOutside={(e) => e.preventDefault()}
         >
-          <div className="p-4 border-b border-mc-border">
+          <div className="p-4 border-b border-border">
             <Dialog.Title asChild>
               <DataLabel>{title}</DataLabel>
             </Dialog.Title>
           </div>
 
           <div className="p-4">
-            <Dialog.Description className="text-mc-text-dim text-sm font-mono">
+            <Dialog.Description className="text-muted text-sm font-mono">
               {description}
             </Dialog.Description>
           </div>
 
-          <div className="flex items-center justify-end gap-2 p-4 border-t border-mc-border">
+          <div className="flex items-center justify-end gap-2 p-4 border-t border-border">
             <Dialog.Close asChild>
               <Button variant="ghost" size="sm">
                 Cancel

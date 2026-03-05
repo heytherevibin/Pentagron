@@ -108,3 +108,12 @@ func (m *Manager) HealthCheck(ctx context.Context) map[string]error {
 	}
 	return statuses
 }
+
+// Close tears down all SSE connections to MCP servers.
+func (m *Manager) Close() {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, client := range m.servers {
+		client.Close()
+	}
+}
