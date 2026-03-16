@@ -42,7 +42,6 @@ type Client struct {
 	closeOnce sync.Once // ensures send is closed exactly once
 	hub       *Hub
 	log       *zap.Logger
-	closeOnce sync.Once
 }
 
 // Hub manages all active WebSocket connections and broadcasts messages.
@@ -91,13 +90,8 @@ func (h *Hub) Register(c *Client) {
 	)
 }
 
-<<<<<<< HEAD
 // Unregister removes a client from the hub. Safe to call multiple times
 // (both ReadPump and WritePump defer Unregister; sync.Once prevents double-close).
-=======
-// Unregister removes a client from the hub. Safe to call multiple times.
-// Does not close the client's send channel; the client must do that exactly once.
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
 func (h *Hub) Unregister(c *Client) {
 	h.mu.Lock()
 	if clients, ok := h.clients[c.flowID]; ok {
@@ -106,13 +100,10 @@ func (h *Hub) Unregister(c *Client) {
 			delete(h.clients, c.flowID)
 		}
 	}
-<<<<<<< HEAD
 	h.mu.Unlock()
 	// Close the send channel exactly once, regardless of how many goroutines
 	// call Unregister (ReadPump and WritePump both defer it).
 	c.closeOnce.Do(func() { close(c.send) })
-=======
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
 }
 
 // Broadcast sends a message to all clients subscribed to a flow.

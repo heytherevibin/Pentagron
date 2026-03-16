@@ -269,7 +269,6 @@ func (e *EvoGraph) append(sessionID string, entry chainEntry) {
 	e.chains[sessionID] = append(e.chains[sessionID], entry)
 }
 
-<<<<<<< HEAD
 // allowedLabels is the whitelist of valid EvoGraph node type labels.
 // Using a whitelist prevents Cypher injection through the label parameter.
 var allowedLabels = map[string]bool{
@@ -289,13 +288,10 @@ func (e *EvoGraph) writeAndAppend(ctx context.Context, label, sessionID string, 
 		)
 		return
 	}
-
-=======
-func (e *EvoGraph) writeNode(ctx context.Context, label, sessionID string, props map[string]interface{}) {
 	if e.neo4j == nil {
+		e.append(sessionID, entry)
 		return
 	}
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
 	session := e.neo4j.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 

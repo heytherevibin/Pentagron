@@ -125,14 +125,9 @@ export default function FlowPage() {
 
   const handleApprove = async (approvalId: string, notes?: string) => {
     try {
-<<<<<<< HEAD
-      await flowsApi.approve(id, approvalId, notes);
-      toast.success('Phase transition approved');
-      fetchData();
-=======
       await flowsApi.approve(id, approvalId, notes)
+      toast.success('Phase transition approved')
       fetchData()
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
     } catch {
       toast.error('Approval failed')
     }
@@ -140,14 +135,9 @@ export default function FlowPage() {
 
   const handleReject = async (approvalId: string, notes?: string) => {
     try {
-<<<<<<< HEAD
-      await flowsApi.reject(id, approvalId, notes);
-      toast.success('Phase transition rejected');
-      fetchData();
-=======
       await flowsApi.reject(id, approvalId, notes)
+      toast.success('Phase transition rejected')
       fetchData()
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
     } catch {
       toast.error('Rejection failed')
     }
@@ -285,15 +275,17 @@ export default function FlowPage() {
               <div>
                 <DataLabel>PHASE</DataLabel>
                 <ul className="mt-1.5 space-y-0.5">
-                  {[
-                    { key: 'recon', label: 'Reconnaissance' },
-                    { key: 'analysis', label: 'Analysis' },
-                    { key: 'exploitation', label: 'Exploitation' },
-                    { key: 'post_exploitation', label: 'Post-Exploitation' },
-                    { key: 'reporting', label: 'Reporting' },
-                  ].map(({ key, label }) => {
+                  {(
+                    [
+                      { key: 'recon', label: 'Reconnaissance' },
+                      { key: 'analysis', label: 'Analysis' },
+                      { key: 'exploitation', label: 'Exploitation' },
+                      { key: 'post_exploitation', label: 'Post-Exploitation' },
+                      { key: 'reporting', label: 'Reporting' },
+                    ] as { key: typeof phaseOrder[number]; label: string }[]
+                  ).map(({ key, label }) => {
                     const current = (flow?.phase ?? 'recon') === key
-                    const currentIdx = phaseOrder.indexOf(flow?.phase ?? 'recon')
+                    const currentIdx = phaseOrder.indexOf((flow?.phase ?? 'recon') as typeof phaseOrder[number])
                     const thisIdx = phaseOrder.indexOf(key)
                     const done = flow?.status === 'completed' || thisIdx < currentIdx
                     return (

@@ -243,24 +243,6 @@ export default function ProjectDetailPage() {
                   href={`/flows/${flow.id}`}
                   className="grid grid-cols-[minmax(0,2fr)_auto_auto_minmax(0,1.5fr)_auto] gap-3 px-4 py-3 border-b border-border last:border-b-0 hover:bg-surface-2 transition-colors cursor-pointer items-center"
                 >
-<<<<<<< HEAD
-                  + NEW FLOW
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <div>
-            {/* Table header */}
-            <div className="grid grid-cols-[2fr_1fr_1fr_2fr_1.5fr_1fr_auto] gap-3 px-3 py-2 border-b border-mc-border">
-              <DataLabel>FLOW</DataLabel>
-              <DataLabel>STATUS</DataLabel>
-              <DataLabel>PHASE</DataLabel>
-              <DataLabel>OBJECTIVE</DataLabel>
-              <DataLabel>PROGRESS</DataLabel>
-              <DataLabel>TIME</DataLabel>
-              <DataLabel></DataLabel>
-=======
                   <span className="text-sm font-mono text-foreground truncate">
                     {flow.name}
                   </span>
@@ -276,79 +258,22 @@ export default function ProjectDetailPage() {
                   </span>
                 </Link>
               ))}
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
             </div>
           )}
         </Panel>
 
-<<<<<<< HEAD
-            {/* Flow rows */}
-            {flowList.map((flow) => (
-              <div
-                key={flow.id}
-                className="grid grid-cols-[2fr_1fr_1fr_2fr_1.5fr_1fr_auto] gap-3 px-3 py-3 border-b border-mc-border last:border-b-0 hover:bg-mc-surface-hover transition-colors items-center"
-              >
-                <Link href={`/flows/${flow.id}`} className="contents">
-                  <span className="text-sm font-mono text-mc-text truncate">
-                    {flow.name}
-                  </span>
-                  <StatusBadge variant="flow" status={flow.status} />
-                  <span className="text-xxs font-mono uppercase text-mc-text-dim tracking-wider">
-                    {flow.phase?.replace(/_/g, ' ') ?? '--'}
-                  </span>
-                  <span className="text-xs font-mono text-mc-text-dim truncate">
-                    {truncate(flow.objective, 40)}
-                  </span>
-                  <PhaseProgress
-                    currentPhase={flow.phase ?? 'recon'}
-                    status={flow.status}
-                    compact
-                  />
-                  <span className="text-xxs font-mono text-mc-text-ghost">
-                    {formatTimestamp(flow.created_at)}
-                  </span>
-                </Link>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    setDeleteTarget(flow.id)
-                    setDeleteOpen(true)
-                  }}
-                  className="text-mc-text-ghost hover:text-mc-crimson transition-colors text-xs font-mono px-1"
-                  title="Delete flow"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </Panel>
 
-      {/* ── Delete Confirm Dialog ───────────────────────────────────── */}
+      {/* Delete Confirm Dialog */}
       <ConfirmDialog
-=======
-        {/* Delete Confirm Dialog */}
-        <ConfirmDialog
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="DELETE FLOW"
         description="This will permanently destroy the flow and all associated data. This action cannot be undone."
         variant="danger"
         confirmLabel="DELETE"
-<<<<<<< HEAD
         onConfirm={handleDeleteFlow}
       />
     </div>
-=======
-        onConfirm={() => {
-          setDeleteOpen(false)
-          setDeleteTarget(null)
-        }}
-        />
-      </div>
     </PageContentShell>
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/Button'
@@ -298,7 +298,7 @@ function TabSkeleton() {
 
 const TAB_KEYS: TabKey[] = ['general', 'llm', 'agents', 'mcp', 'users', 'health']
 
-export default function SettingsPage() {
+function SettingsContent() {
   const searchParams = useSearchParams()
   const tabFromUrl = searchParams.get('tab')
   const initialTab: TabKey =
@@ -441,7 +441,6 @@ export default function SettingsPage() {
     try {
       const res = await api.get('/api/settings/mcp')
       const data = res.data?.data ?? res.data
-<<<<<<< HEAD
       // Backend returns servers as an object map: { naabu: "url", sqlmap: "url" }
       if (data?.servers && typeof data.servers === 'object' && !Array.isArray(data.servers)) {
         const svrMap = data.servers as Record<string, string>
@@ -453,15 +452,6 @@ export default function SettingsPage() {
             }
             return s
           })
-=======
-      const servers = data?.servers
-      if (servers && typeof servers === 'object' && !Array.isArray(servers)) {
-        setMcpServers((prev) =>
-          prev.map((s) => ({
-            ...s,
-            url: (servers[s.name.toLowerCase()] as string) ?? s.url,
-          }))
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
         )
       }
     } catch {
@@ -647,20 +637,12 @@ export default function SettingsPage() {
   async function saveMCP() {
     setSaving(true)
     try {
-<<<<<<< HEAD
       // Backend expects servers as an object map: { naabu: "url", sqlmap: "url" }
       const serversMap: Record<string, string> = {}
       for (const s of mcpServers) {
         serversMap[s.name.toLowerCase()] = s.url
       }
       await api.put('/api/settings/mcp', { servers: serversMap })
-=======
-      const servers: Record<string, string> = {}
-      mcpServers.forEach((s) => {
-        servers[s.name.toLowerCase()] = s.url
-      })
-      await api.put('/api/settings/mcp', { servers })
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
       toast.success('MCP settings saved')
     } catch {
       toast.error('Failed to save MCP settings')
@@ -1054,13 +1036,8 @@ export default function SettingsPage() {
                 }))
               }
             />
-<<<<<<< HEAD
-            <p className="text-xxs font-mono text-mc-text-ghost -mt-3">
-              {(agentSettings.summarizerLastSecBytes / 1024).toFixed(0)} KB
-=======
             <p className="text-xxs font-mono text-muted -mt-3">
-              {(agentSettings.summarizerMaxInputBytes / 1024).toFixed(0)} KB
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
+              {(agentSettings.summarizerLastSecBytes / 1024).toFixed(0)} KB
             </p>
 
             <Input
@@ -1075,13 +1052,8 @@ export default function SettingsPage() {
                 }))
               }
             />
-<<<<<<< HEAD
-            <p className="text-xxs font-mono text-mc-text-ghost -mt-3">
-              {(agentSettings.summarizerMaxQABytes / 1024).toFixed(0)} KB
-=======
             <p className="text-xxs font-mono text-muted -mt-3">
-              {(agentSettings.summarizerMaxOutputBytes / 1024).toFixed(0)} KB
->>>>>>> 40e84f4b2da7f71c5441224a1b666decf4dd5066
+              {(agentSettings.summarizerMaxQABytes / 1024).toFixed(0)} KB
             </p>
           </div>
         </Panel>
@@ -1540,5 +1512,13 @@ export default function SettingsPage() {
         {loading ? <TabSkeleton /> : TAB_CONTENT[activeTab]()}
       </div>
     </PageContentShell>
+  )
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsContent />
+    </Suspense>
   )
 }
