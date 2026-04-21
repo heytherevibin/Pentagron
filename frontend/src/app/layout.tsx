@@ -1,53 +1,63 @@
 import type { Metadata, Viewport } from 'next'
-import { JetBrains_Mono } from 'next/font/google'
-import { Toaster } from 'react-hot-toast'
+import { GeistSans } from 'geist/font/sans'
+import { GeistMono } from 'geist/font/mono'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { Toaster } from '@/components/ui/sonner'
+import { cn } from '@/lib/utils'
 import './globals.css'
-import '@/styles/grid-overrides.css'
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono',
-})
 
 export const metadata: Metadata = {
-  title: 'PENTAGRON',
-  description: 'Autonomous AI penetration testing framework',
+  title: {
+    default: 'Pentagron · Autonomous Penetration Testing',
+    template: '%s · Pentagron',
+  },
+  description:
+    'Autonomous AI penetration testing framework — orchestrated multi-agent security assessments with EvoGraph memory.',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icons/icon-192x192.svg',
+    apple: '/icons/icon-192x192.svg',
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'Pentagron',
+    title: 'Pentagron · Autonomous Penetration Testing',
+    description: 'Production-grade, fully automated security assessment platform.',
+  },
 }
 
 export const viewport: Viewport = {
   themeColor: '#000000',
+  colorScheme: 'dark',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={jetbrainsMono.variable}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={cn(GeistSans.variable, GeistMono.variable, 'dark')}
+      style={{
+        // Map Geist's default `--font-geist-sans` / `--font-geist-mono`
+        // onto our design-system variable names so Tailwind picks them up.
+        // (The geist/font package sets these automatically; this is a
+        // defensive alias in case of any naming mismatch.)
+        ['--font-sans' as string]: 'var(--font-geist-sans)',
+        ['--font-mono' as string]: 'var(--font-geist-mono)',
+      }}
+    >
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="font-mono antialiased min-h-screen bg-background text-foreground">
-        {children}
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: 'var(--surface-1)',
-              color: 'var(--foreground)',
-              border: '1px solid var(--border)',
-              borderRadius: '0',
-              fontFamily: 'var(--font-mono), monospace',
-              fontSize: '12px',
-            },
-            success: {
-              iconTheme: { primary: '#34d399', secondary: 'var(--surface-1)' },
-            },
-            error: {
-              iconTheme: { primary: '#f87171', secondary: 'var(--surface-1)' },
-            },
-          }}
-        />
+      <body className="min-h-screen bg-bg text-fg font-sans antialiased selection:bg-accent/25">
+        <TooltipProvider delayDuration={200} skipDelayDuration={300}>
+          {children}
+        </TooltipProvider>
+        <Toaster />
       </body>
     </html>
   )

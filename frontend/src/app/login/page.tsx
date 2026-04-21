@@ -1,193 +1,198 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import * as React from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { auth, api } from '@/lib/api'
-import { Input } from '@/components/ui/Input'
-import { Button } from '@/components/ui/Button'
-import { GlowDot } from '@/components/ui/GlowDot'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowRight, AlertTriangle, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { toast } from 'sonner'
 
-function LoginForm() {
+import { AuthLayout } from '@/components/auth/auth-layout'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Kbd } from '@/components/ui/kbd'
+import { auth } from '@/lib/api'
+
+export default function LoginPage() {
+  return (
+    <React.Suspense fallback={<LoginLayoutFallback />}>
+      <LoginPageInner />
+    </React.Suspense>
+  )
+}
+
+/** Shown while the Suspense boundary resolves the search params. */
+function LoginLayoutFallback() {
+  return (
+    <AuthLayout eyebrow="Operator access" title="Sign in to Pentagron">
+      <div className="h-[220px]" />
+    </AuthLayout>
+  )
+}
+
+function LoginPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [systemOnline, setSystemOnline] = useState<boolean | null>(null)
+  const redirect = searchParams.get('redirect') ?? '/'
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem('pentagron_token')) {
-      router.push('/')
-    }
-  }, [router])
+  const [email, setEmail] = React.useState('')
+  const [password, setPassword] = React.useState('')
+  const [showPassword, setShowPassword] = React.useState(false)
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
 
-  useEffect(() => {
-    api.get('/health')
-      .then(() => setSystemOnline(true))
-      .catch(() => setSystemOnline(false))
+  const emailRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    emailRef.current?.focus()
   }, [])
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setLoading(true)
+    if (loading) return
     setError(null)
+    setLoading(true)
 
     try {
-      const res = await auth.login(email, password)
-      const token = res.data?.token
-      if (!token) {
-        setError('INVALID SERVER RESPONSE')
-        return
-      }
-
-      localStorage.setItem('pentagron_token', token)
-      document.cookie = `pentagron_token=${token}; path=/; SameSite=Lax`
-
-      // Validate redirect is a local path to prevent open-redirect attacks.
-      const raw = searchParams.get('redirect') ?? '/'
-      const redirect = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
-      router.push(redirect)
-    } catch {
-      setError('ACCESS DENIED')
+      const { data } = await auth.login(email.trim(), password)
+      localStorage.setItem('pentagron_token', data.token)
+      sessionStorage.setItem('pentagron_token', data.token)
+      document.cookie = `pentagron_token=${data.token}; path=/; max-age=86400; samesite=lax`
+      toast.success('Signed in', {
+        description: `Welcome back, ${data.user?.email ?? 'operator'}.`,
+      })
+      router.replace(redirect)
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string; message?: string } }; message?: string }
+      const msg =
+        e.response?.data?.error ??
+        e.response?.data?.message ??
+        e.message ??
+        'Sign-in failed. Check your credentials and try again.'
+      setError(msg)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="auth-layout">
-      {/* Brand panel (left) */}
-      <div className="auth-brand">
-        <div className="auth-brand-waves" />
-
-        <div className="relative z-10">
-          <div className="flex items-center gap-3">
-            <span className="text-blue-500 text-2xl font-bold tracking-tight">[P]</span>
-            <span className="text-foreground text-lg font-semibold tracking-tight">PENTAGRON</span>
-          </div>
-          <p className="text-muted text-xs mt-1">Autonomous Penetration Testing Framework</p>
+    <AuthLayout
+      eyebrow="Operator access"
+      title="Sign in to Pentagron"
+      subtitle="Enter your credentials to resume your engagements."
+      footerSlot={
+        <div className="hidden sm:flex items-center gap-2 text-2xs text-fg-subtle font-mono">
+          <span>press</span>
+          <Kbd>⏎</Kbd>
+          <span>to sign in</span>
         </div>
+      }
+    >
+      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+        {/* ── Error banner ─────────────────────────────────────────────── */}
+        <AnimatePresence initial={false}>
+          {error && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, y: -4, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -4, height: 0 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="flex items-start gap-2.5 rounded-md border border-sev-critical/30 bg-sev-critical/5 px-3 py-2.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-sev-critical mt-0.5 shrink-0" />
+                <div className="text-xs leading-relaxed text-sev-critical/90">{error}</div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <div className="relative z-10 space-y-6">
-          <div>
-            <div className="w-12 h-[2px] bg-blue-500 mb-4" />
-            <h2 className="text-foreground text-xl font-semibold tracking-tight leading-tight">
-              AI-Powered Offensive
-              <br />
-              Security Operations
-            </h2>
-            <p className="text-muted text-xs mt-3 max-w-md leading-relaxed">
-              Automated reconnaissance, vulnerability discovery, exploitation,
-              and post-exploitation with full audit trails and phase-gated approvals.
-            </p>
-          </div>
-        </div>
-
-        <div className="relative z-10 flex items-center gap-2">
-          <GlowDot
-            status={systemOnline === null ? 'offline' : systemOnline ? 'ok' : 'error'}
-            size="sm"
+        {/* ── Email ────────────────────────────────────────────────────── */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            ref={emailRef}
+            id="email"
+            type="email"
+            inputMode="email"
+            autoComplete="username"
+            placeholder="admin@pentagron.local"
+            size="lg"
+            leftSlot={<Mail />}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
+            required
           />
-          <span className="text-muted text-[10px] uppercase tracking-widest-plus">
-            {systemOnline === null
-              ? 'Checking system...'
-              : systemOnline
-                ? 'System Online'
-                : 'System Offline'}
+        </div>
+
+        {/* ── Password ─────────────────────────────────────────────────── */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="password" hint={password ? `${password.length} chars` : undefined}>
+            Password
+          </Label>
+          <Input
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            placeholder="••••••••••••"
+            size="lg"
+            leftSlot={<Lock />}
+            rightSlot={
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                className="pointer-events-auto inline-flex h-5 w-5 items-center justify-center rounded text-fg-subtle hover:text-fg transition-colors duration-120 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff /> : <Eye />}
+              </button>
+            }
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+            required
+          />
+        </div>
+
+        {/* ── Submit ───────────────────────────────────────────────────── */}
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          loading={loading}
+          rightIcon={!loading ? <ArrowRight /> : undefined}
+          className="mt-2 w-full justify-center"
+          disabled={loading || !email || !password}
+        >
+          {loading ? 'Signing in…' : 'Sign in'}
+        </Button>
+
+        {/* ── Secondary row ────────────────────────────────────────────── */}
+        <div className="mt-3 flex items-center justify-between text-xs">
+          <Link
+            href="/setup"
+            className="text-fg-muted hover:text-fg transition-colors duration-120 underline-offset-4 hover:underline"
+          >
+            First-run setup
+          </Link>
+          <span className="text-fg-subtle font-mono text-2xs uppercase tracking-widest">
+            JWT · 24h session
           </span>
         </div>
+      </form>
+
+      {/* ── Fine print ─────────────────────────────────────────────────── */}
+      <div className="mt-10 rounded-md border border-border-subtle bg-bg-subtle/40 px-3.5 py-3">
+        <p className="text-2xs leading-relaxed text-fg-subtle">
+          <span className="text-fg-muted font-medium">Authorised use only.</span>{' '}
+          Pentagron is intended for security assessments you have explicit written
+          permission to conduct. Activity is audit-logged and attributable to your account.
+        </p>
       </div>
-
-      {/* Divider */}
-      <div className="auth-divider" />
-
-      {/* Auth form (right) */}
-      <div className="auth-main">
-        <div className="auth-form-wrap space-y-8">
-          {/* System status (mobile only) */}
-          <div className="flex items-center gap-2 lg:hidden">
-            <GlowDot
-              status={systemOnline === null ? 'offline' : systemOnline ? 'ok' : 'error'}
-              size="sm"
-            />
-            <span className="text-muted text-[10px] uppercase tracking-widest-plus">
-              {systemOnline === null
-                ? 'Checking...'
-                : systemOnline
-                  ? 'System Online'
-                  : 'System Offline'}
-            </span>
-          </div>
-
-          {/* Header */}
-          <div>
-            <p className="text-muted text-[10px] uppercase tracking-widest-plus mb-3">Sign In</p>
-            <h1 className="text-foreground text-lg font-semibold tracking-tight">
-              Authenticate to continue
-            </h1>
-            <p className="text-muted text-xs mt-1">
-              Enter your operator credentials
-            </p>
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div className="bg-red-500/5 border border-red-500/20 p-3">
-              <span className="text-red-400 text-xs font-mono font-bold">{error}</span>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <Input
-              label="OPERATOR ID"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@pentagron.local"
-              autoComplete="email"
-              required
-            />
-
-            <Input
-              label="ACCESS KEY"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••"
-              autoComplete="current-password"
-              required
-            />
-
-            <Button
-              type="submit"
-              variant="primary"
-              loading={loading}
-              className="w-full h-9"
-            >
-              Authenticate
-            </Button>
-          </form>
-
-          {/* Footer */}
-          <p className="text-muted text-[10px] text-center">
-            Pentagron v0.1.0
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <span className="text-muted text-xs font-mono animate-pulse">Loading...</span>
-      </div>
-    }>
-      <LoginForm />
-    </Suspense>
+    </AuthLayout>
   )
 }

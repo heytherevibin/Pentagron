@@ -1,359 +1,539 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import * as React from 'react'
 import Link from 'next/link'
-import toast from 'react-hot-toast'
-import { flows as flowsApi } from '@/lib/api'
-import { GlowDot } from '@/components/ui/GlowDot'
-import { DataLabel } from '@/components/ui/DataLabel'
-import { Button } from '@/components/ui/Button'
-import { Panel } from '@/components/ui/Panel'
-import { StatusBadge } from '@/components/ui/StatusBadge'
-import { PhaseProgress } from '@/components/ui/PhaseProgress'
-import { FlowDetailPageSkeleton } from '@/components/ui/Skeleton'
-import { PageContentShell } from '@/components/layout/PageContentShell'
-import AgentChat from '@/components/AgentChat'
-import GraphVisualization from '@/components/GraphVisualization'
-import ApprovalDialog from '@/components/ApprovalDialog'
-import type { Flow, FlowStatus, ApprovalRequest, GraphNode, GraphEdge } from '@/types'
+import { useParams } from 'next/navigation'
+import useSWR from 'swr'
+import {
+  AlertTriangle,
+  Download,
+  Play,
+  StopCircle,
+  RefreshCw,
+  Trash2,
+  Clock,
+  Target,
+} from 'lucide-react'
+import { toast } from 'sonner'
 
-function downloadBlob(blob: Blob, filename: string) {
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { StatusDot } from '@/components/ui/status-dot'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PageHeader, PageShell } from '@/components/shell/page-header'
+import { PhaseProgress } from '@/components/flow/phase-progress'
+import { ReactTimeline } from '@/components/flow/timeline'
+import { AgentChat } from '@/components/flow/agent-chat'
+import { ApprovalsPanel } from '@/components/flow/approvals'
+import { useAgentWebSocket } from '@/hooks/useAgentWebSocket'
+import { flows } from '@/lib/api'
+import { STATUS_CLASSES, STATUS_LABEL, PHASE_LABEL } from '@/lib/constants'
+import { cn, formatDateTime, timeAgo } from '@/lib/utils'
+import type { ApprovalRequest, Flow, WSMessage } from '@/types'
+
+/**
+ * Flow detail — the command center for a single pipeline.
+ *
+ *   ┌─ Header: name · status · project · controls ─────────────────┐
+ *   │  Phase progress bar                                          │
+ *   ├── Tabs: Timeline · Chat · Approvals · Artifacts · Report ────┤
+ *   │  (tab content renders below)                                 │
+ *   └──────────────────────────────────────────────────────────────┘
+ *
+ * Timeline + chat share one persistent WebSocket; approvals refetch via SWR
+ * when new activity is detected or after a user action.
+ */
+export default function FlowDetailPage() {
+  const params = useParams<{ id: string }>()
+  const flowId = params?.id ?? ''
+
+  const { data: flowData, isLoading, error, mutate: mutateFlow } = useSWR(
+    flowId ? `/api/flows/${flowId}` : null,
+    () => flows.get(flowId).then((r) => r.data as { flow: Flow; session_id?: string }),
+    { refreshInterval: 10_000 },
+  )
+  const { data: approvalsData, mutate: mutateApprovals } = useSWR(
+    flowId ? `/api/flows/${flowId}/approvals` : null,
+    () => flows.listApprovals(flowId).then((r) => r.data as { approvals?: ApprovalRequest[] }),
+    { refreshInterval: 15_000 },
+  )
+
+  const flow = flowData?.flow
+  const sessionId = flowData?.session_id ?? flowId
+  const approvals = approvalsData?.approvals ?? []
+  const pendingApprovals = approvals.filter((a) => a.status === 'pending').length
+
+  // Stream — mount only once we know the flow exists, so we don't fire a
+  // connection at `/ws/agent/undefined`.
+  const { messages, connected, sendGuidance } = useAgentWebSocket({
+    sessionId: flow ? sessionId : '',
+    flowId: flow ? flowId : '',
+    onMessage: React.useCallback(
+      (m: WSMessage) => {
+        if (m.type === 'phase_change' || m.type === 'approval_request') {
+          void mutateFlow()
+          void mutateApprovals()
+        }
+      },
+      [mutateFlow, mutateApprovals],
+    ),
+  })
+
+  if (isLoading) return <FlowSkeleton />
+  if (error || !flow) return <FlowNotFound />
+
+  return (
+    <PageShell>
+      <PageHeader
+        backHref={flow.project_id ? `/projects/${flow.project_id}` : '/flows'}
+        backLabel={flow.project_id ? 'Project' : 'Flows'}
+        eyebrow="Flow"
+        title={flow.name}
+        subtitle={flow.objective || 'No objective set.'}
+        actions={<FlowControls flow={flow} onMutate={mutateFlow} />}
+      />
+
+      {/* ── Status strip ─────────────────────────────────────────────────── */}
+      <StatusStrip flow={flow} connected={connected} pendingApprovals={pendingApprovals} />
+
+      {/* ── Phase progress ───────────────────────────────────────────────── */}
+      <Card className="mt-4">
+        <CardContent className="py-4">
+          <PhaseProgress current={flow.phase} />
+        </CardContent>
+      </Card>
+
+      {/* ── Tabs ─────────────────────────────────────────────────────────── */}
+      <Tabs defaultValue="timeline" className="mt-4">
+        <TabsList className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="chat">Agent chat</TabsTrigger>
+          <TabsTrigger value="approvals">
+            Approvals
+            {pendingApprovals > 0 && (
+              <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sev-high/20 text-sev-high text-[10px] font-mono px-1">
+                {pendingApprovals}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="graph">Attack graph</TabsTrigger>
+          <TabsTrigger value="report">Report</TabsTrigger>
+        </TabsList>
+
+        {/* Timeline */}
+        <TabsContent value="timeline" className="mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm">ReAct stream</CardTitle>
+              <span className="text-2xs font-mono uppercase tracking-widest text-fg-subtle">
+                {messages.length} {messages.length === 1 ? 'event' : 'events'}
+              </span>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ScrollArea className="h-[560px] pr-2">
+                <ReactTimeline messages={messages} />
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Chat */}
+        <TabsContent value="chat" className="mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Live stream</CardTitle></CardHeader>
+              <CardContent className="pt-0">
+                <ScrollArea className="h-[460px] pr-2">
+                  <ReactTimeline messages={messages} />
+                </ScrollArea>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Operator guidance</CardTitle></CardHeader>
+              <CardContent className="pt-0">
+                <AgentChat
+                  connected={connected}
+                  onSend={(t) => {
+                    sendGuidance(t)
+                    toast.success('Guidance sent')
+                  }}
+                  disabled={flow.status !== 'running' && flow.status !== 'paused'}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Approvals */}
+        <TabsContent value="approvals" className="mt-4">
+          <Card>
+            <CardContent className="py-5">
+              <ApprovalsPanel
+                flowId={flowId}
+                approvals={approvals}
+                onAction={() => {
+                  void mutateApprovals()
+                  void mutateFlow()
+                }}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Graph — stub, real implementation in the EvoGraph milestone */}
+        <TabsContent value="graph" className="mt-4">
+          <Card>
+            <CardContent className="py-12">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-bg-subtle">
+                  <Target className="h-4 w-4 text-accent" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-fg">Attack-chain graph</div>
+                  <div className="mt-1 text-xs text-fg-muted max-w-md">
+                    A force-directed visualisation of the EvoGraph attack chain ships
+                    in the next milestone. For now you can pull the raw graph via
+                    the API.
+                  </div>
+                </div>
+                <Link
+                  href="/evograph"
+                  className="text-xs text-accent hover:underline underline-offset-4"
+                >
+                  Preview EvoGraph →
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Report */}
+        <TabsContent value="report" className="mt-4">
+          <ReportPanel flow={flow} />
+        </TabsContent>
+      </Tabs>
+    </PageShell>
+  )
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*   Status strip — at-a-glance flow state                                     */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+function StatusStrip({
+  flow,
+  connected,
+  pendingApprovals,
+}: {
+  flow: Flow
+  connected: boolean
+  pendingApprovals: number
+}) {
+  const styles = STATUS_CLASSES[flow.status]
+  return (
+    <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <Cell
+        label="Status"
+        value={
+          <div className="flex items-center gap-2">
+            <StatusDot tone={flow.status === 'running' ? 'accent' : 'muted'} pulse={styles.pulse} size={6} />
+            <Badge variant="outline" className={cn(styles.text, styles.border)}>
+              {STATUS_LABEL[flow.status]}
+            </Badge>
+          </div>
+        }
+      />
+      <Cell label="Phase" value={<span className="text-sm text-fg">{PHASE_LABEL[flow.phase]}</span>} />
+      <Cell
+        label="Stream"
+        value={
+          <div className="flex items-center gap-2">
+            <StatusDot tone={connected ? 'accent' : 'danger'} pulse={connected} size={6} />
+            <span className="text-xs text-fg-muted">
+              {connected ? 'Live' : 'Reconnecting'}
+            </span>
+          </div>
+        }
+      />
+      <Cell
+        label="Approvals"
+        value={
+          <div className="flex items-center gap-2">
+            {pendingApprovals > 0 ? (
+              <>
+                <AlertTriangle className="h-3.5 w-3.5 text-sev-high" />
+                <span className="text-xs text-sev-high">{pendingApprovals} pending</span>
+              </>
+            ) : (
+              <span className="text-xs text-fg-muted">None pending</span>
+            )}
+          </div>
+        }
+      />
+    </div>
+  )
+}
+
+function Cell({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border bg-bg-subtle/40 px-4 py-3">
+      <div className="text-2xs uppercase tracking-widest text-fg-subtle font-mono">{label}</div>
+      <div className="mt-1.5">{value}</div>
+    </div>
+  )
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*   Controls                                                                  */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+function FlowControls({ flow, onMutate }: { flow: Flow; onMutate: () => void }) {
+  const [busy, setBusy] = React.useState<null | 'start' | 'cancel' | 'delete'>(null)
+  const running = flow.status === 'running' || flow.status === 'pending'
+
+  async function start() {
+    if (busy) return
+    setBusy('start')
+    try {
+      await flows.start(flow.id)
+      toast.success('Flow started')
+      onMutate()
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error('Could not start flow', { description: e.response?.data?.error })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function cancel() {
+    if (busy) return
+    if (!confirm('Cancel this flow? Any in-progress work will be interrupted.')) return
+    setBusy('cancel')
+    try {
+      await flows.cancel(flow.id)
+      toast.success('Flow cancelled')
+      onMutate()
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error('Could not cancel flow', { description: e.response?.data?.error })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function remove() {
+    if (busy) return
+    if (!confirm('Delete this flow and all associated data?')) return
+    setBusy('delete')
+    try {
+      await flows.delete(flow.id)
+      toast.success('Flow deleted')
+      window.location.href = flow.project_id ? `/projects/${flow.project_id}` : '/flows'
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error('Could not delete flow', { description: e.response?.data?.error })
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        variant="secondary"
+        size="md"
+        onClick={onMutate}
+        leftIcon={<RefreshCw />}
+        disabled={busy !== null}
+      >
+        Refresh
+      </Button>
+      {!running ? (
+        <Button
+          variant="primary"
+          size="md"
+          onClick={start}
+          loading={busy === 'start'}
+          disabled={busy !== null}
+          leftIcon={<Play />}
+        >
+          Start
+        </Button>
+      ) : (
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={cancel}
+          loading={busy === 'cancel'}
+          disabled={busy !== null}
+          leftIcon={<StopCircle />}
+          className="text-sev-critical hover:text-sev-critical"
+        >
+          Cancel
+        </Button>
+      )}
+      <Button
+        variant="ghost"
+        size="md"
+        onClick={remove}
+        loading={busy === 'delete'}
+        disabled={busy !== null}
+        leftIcon={<Trash2 />}
+        className="text-sev-critical hover:text-sev-critical hover:bg-sev-critical/10"
+      >
+        Delete
+      </Button>
+    </div>
+  )
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*   Report                                                                    */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+function ReportPanel({ flow }: { flow: Flow }) {
+  const [busy, setBusy] = React.useState<null | 'md' | 'json'>(null)
+
+  async function download(format: 'markdown' | 'json') {
+    const kind = format === 'markdown' ? 'md' : 'json'
+    setBusy(kind)
+    try {
+      if (format === 'markdown') {
+        const res = await flows.reportDownload(flow.id, 'markdown')
+        triggerDownload(res.data as Blob, `${flow.name}.md`)
+      } else {
+        const res = await flows.report(flow.id, 'json')
+        const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' })
+        triggerDownload(blob, `${flow.name}.json`)
+      }
+      toast.success(`Downloaded ${format}`)
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error('Report unavailable', {
+        description: e.response?.data?.error ?? 'The report is generated when the flow completes.',
+      })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-sm">Engagement report</CardTitle></CardHeader>
+      <CardContent className="pt-0">
+        <div className="flex flex-col gap-4">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <MetaRow label="Started" icon={Clock} value={formatDateTime(flow.started_at)} />
+            <MetaRow label="Completed" icon={Clock} value={flow.completed_at ? formatDateTime(flow.completed_at) : '—'} />
+            <MetaRow label="Last update" icon={Clock} value={`${timeAgo(flow.updated_at)} · ${formatDateTime(flow.updated_at)}`} />
+            <MetaRow label="Attack path" icon={Target} value={flow.attack_path || '—'} />
+          </dl>
+          <Separator />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => download('markdown')}
+              loading={busy === 'md'}
+              disabled={busy !== null}
+              leftIcon={<Download />}
+            >
+              Download Markdown
+            </Button>
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => download('json')}
+              loading={busy === 'json'}
+              disabled={busy !== null}
+              leftIcon={<Download />}
+            >
+              Download JSON
+            </Button>
+          </div>
+          <div className="text-2xs text-fg-subtle">
+            Reports include MITRE ATT&amp;CK mapping, CVSS scoring, and a remediation
+            roadmap. They&apos;re available after the flow reaches the reporting phase.
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function MetaRow({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string
+  value: React.ReactNode
+  icon: React.ComponentType<{ className?: string }>
+}) {
+  return (
+    <div className="flex items-center gap-2.5 min-w-0">
+      <Icon className="h-3.5 w-3.5 text-fg-subtle shrink-0" />
+      <div className="min-w-0">
+        <div className="text-2xs uppercase tracking-widest text-fg-subtle font-mono">{label}</div>
+        <div className="mt-0.5 text-xs text-fg truncate">{value}</div>
+      </div>
+    </div>
+  )
+}
+
+function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  document.body.appendChild(a)
   a.click()
+  a.remove()
   URL.revokeObjectURL(url)
 }
 
-function formatTimestamp(ts?: string | null): string {
-  if (!ts) return '\u2014'
-  try {
-    return new Date(ts).toLocaleString('en-US', {
-      month: 'short',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    })
-  } catch {
-    return ts
-  }
-}
+/* ────────────────────────────────────────────────────────────────────────── */
+/*   Loading / not found                                                       */
+/* ────────────────────────────────────────────────────────────────────────── */
 
-function statusToGlow(
-  status?: FlowStatus,
-): 'ok' | 'warning' | 'error' | 'offline' {
-  if (!status) return 'offline'
-  if (status === 'running') return 'ok'
-  if (status === 'paused') return 'warning'
-  if (status === 'failed' || status === 'cancelled') return 'error'
-  return 'offline'
-}
-
-export default function FlowPage() {
-  const params = useParams<{ id: string }>()
-  const id = params.id
-
-  const [flow, setFlow] = useState<Flow | null>(null)
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
-  const [graphNodes, setGraphNodes] = useState<GraphNode[]>([])
-  const [graphEdges, setGraphEdges] = useState<GraphEdge[]>([])
-  const [loading, setLoading] = useState(true)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const fetchData = useCallback(async () => {
-    try {
-      const [flowRes, approvalRes, graphRes] = await Promise.all([
-        flowsApi.get(id),
-        flowsApi.listApprovals(id),
-        flowsApi.graph(id).catch(() => ({ data: { nodes: [], edges: [] } })),
-      ])
-      setFlow(flowRes.data)
-      setApprovals(approvalRes.data)
-      setGraphNodes(graphRes.data?.nodes ?? [])
-      setGraphEdges(graphRes.data?.edges ?? [])
-    } catch {
-      toast.error('Failed to load flow data')
-    } finally {
-      setLoading(false)
-    }
-  }, [id])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  useEffect(() => {
-    const shouldPoll =
-      flow?.status === 'running' ||
-      flow?.status === 'paused'
-
-    if (shouldPoll) {
-      pollRef.current = setInterval(fetchData, 5000)
-    }
-
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current)
-        pollRef.current = null
-      }
-    }
-  }, [flow?.status, fetchData])
-
-  const handleStart = async () => {
-    try {
-      await flowsApi.start(id)
-      toast.success('Flow started')
-      fetchData()
-    } catch {
-      toast.error('Failed to start flow')
-    }
-  }
-
-  const handleCancel = async () => {
-    try {
-      await flowsApi.cancel(id)
-      toast.success('Flow cancelled')
-      fetchData()
-    } catch {
-      toast.error('Failed to cancel flow')
-    }
-  }
-
-  const handleApprove = async (approvalId: string, notes?: string) => {
-    try {
-      await flowsApi.approve(id, approvalId, notes)
-      toast.success('Phase transition approved')
-      fetchData()
-    } catch {
-      toast.error('Approval failed')
-    }
-  }
-
-  const handleReject = async (approvalId: string, notes?: string) => {
-    try {
-      await flowsApi.reject(id, approvalId, notes)
-      toast.success('Phase transition rejected')
-      fetchData()
-    } catch {
-      toast.error('Rejection failed')
-    }
-  }
-
-  const pendingApproval =
-    approvals.find((a) => a.status === 'pending') ?? null
-
-  const prevPendingRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!pendingApproval) {
-      prevPendingRef.current = null
-      return
-    }
-    if (pendingApproval.id === prevPendingRef.current) return
-    prevPendingRef.current = pendingApproval.id
-
-    if (
-      typeof Notification !== 'undefined' &&
-      Notification.permission === 'granted' &&
-      document.hidden
-    ) {
-      new Notification('PENTAGRON — Approval Required', {
-        body: `Phase transition needs authorization: ${pendingApproval.phase ?? 'unknown'}`,
-        icon: '/icons/icon-192x192.svg',
-      })
-    }
-  }, [pendingApproval])
-
-  if (loading) {
-    return <FlowDetailPageSkeleton />
-  }
-
-  const flowName = flow?.name ?? id
-  const phaseOrder = ['recon', 'analysis', 'exploitation', 'post_exploitation', 'reporting'] as const
-
+function FlowSkeleton() {
   return (
-    <PageContentShell variant="fullHeight" fullWidth innerClassName="page-inner-no-padding">
-      {/* Header — single row: breadcrumb + flow title, then status + actions */}
-      <header className="shrink-0 border-b border-border px-4 py-3 sm:px-6">
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-          <nav className="flex items-center gap-1.5 text-xs font-mono text-muted min-w-0">
-            <Link href="/" className="hover:text-foreground transition-colors truncate">
-              Dashboard
+    <PageShell>
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="h-8 w-80 mt-4" />
+      <Skeleton className="h-4 w-96 mt-2" />
+      <div className="mt-6 grid grid-cols-4 gap-3">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-16" />
+        ))}
+      </div>
+      <Skeleton className="h-24 w-full mt-4" />
+      <Skeleton className="h-[400px] w-full mt-4" />
+    </PageShell>
+  )
+}
+
+function FlowNotFound() {
+  return (
+    <PageShell>
+      <Card>
+        <CardContent className="py-12">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <AlertTriangle className="h-5 w-5 text-sev-critical" />
+            <div className="text-sm font-medium text-fg">Flow not found</div>
+            <div className="text-xs text-fg-muted">
+              It may have been deleted or you may not have access.
+            </div>
+            <Link href="/flows">
+              <Button variant="secondary" size="sm">Back to flows</Button>
             </Link>
-            <span aria-hidden>/</span>
-            {flow?.project_id && (
-              <>
-                <Link
-                  href={`/projects/${flow.project_id}`}
-                  className="hover:text-foreground transition-colors truncate"
-                >
-                  Project
-                </Link>
-                <span aria-hidden>/</span>
-              </>
-            )}
-            <span className="text-foreground font-medium truncate">{flowName}</span>
-          </nav>
-          <div className="flex items-center gap-2 ml-auto shrink-0">
-            <GlowDot status={statusToGlow(flow?.status)} />
-            <StatusBadge status={flow?.status ?? 'pending'} />
-            {flow?.status === 'pending' && (
-              <Button onClick={handleStart} size="sm">
-                Start
-              </Button>
-            )}
-            {(flow?.status === 'running' || flow?.status === 'paused') && (
-              <Button onClick={handleCancel} variant="danger" size="sm">
-                Cancel
-              </Button>
-            )}
-            {(flow?.status === 'completed' || flow?.status === 'failed') && (
-              <>
-                <Button
-                  onClick={async () => {
-                    if (!flow) return
-                    try {
-                      const res = await flowsApi.reportDownload(id)
-                      const blob = new Blob([res.data], { type: 'text/markdown' })
-                      const safeName = (flow.name ?? flow.id).replace(/[^a-zA-Z0-9_-]/g, '_')
-                      downloadBlob(blob, `pentagron-report-${safeName}.md`)
-                      toast.success('Report exported')
-                    } catch {
-                      toast.error('Failed to export report')
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                >
-                  Export MD
-                </Button>
-                <Button
-                  onClick={async () => {
-                    if (!flow) return
-                    try {
-                      const res = await flowsApi.reportDownload(id, 'pdf')
-                      const blob = new Blob([res.data], { type: 'application/pdf' })
-                      const safeName = (flow.name ?? flow.id).replace(/[^a-zA-Z0-9_-]/g, '_')
-                      downloadBlob(blob, `pentagron-report-${safeName}.pdf`)
-                      toast.success('PDF report exported')
-                    } catch {
-                      toast.error('Failed to export PDF report')
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                >
-                  Export PDF
-                </Button>
-              </>
-            )}
           </div>
-        </div>
-        <div className="mt-2">
-          <PhaseProgress currentPhase={flow?.phase ?? 'recon'} status={flow?.status ?? 'pending'} />
-        </div>
-      </header>
-
-      {/* 3-panel mission control: Agent Activity | Telemetry | EvoGraph */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-        <section className="flex-1 lg:w-1/2 min-h-[360px] lg:min-h-0 flex flex-col overflow-hidden">
-          <Panel
-            title="AGENT ACTIVITY"
-            className="flex-1 flex flex-col min-h-0 border-r border-border rounded-none"
-            contentClassName="flex-1 min-h-0 p-0 overflow-hidden"
-          >
-            <AgentChat flowId={id} />
-          </Panel>
-        </section>
-
-        <section className="lg:w-[280px] xl:w-[320px] shrink-0 border-r border-border overflow-y-auto flex flex-col">
-          <Panel title="TELEMETRY" className="h-full flex flex-col rounded-none">
-            <div className="space-y-4">
-              <div>
-                <DataLabel>PHASE</DataLabel>
-                <ul className="mt-1.5 space-y-0.5">
-                  {(
-                    [
-                      { key: 'recon', label: 'Reconnaissance' },
-                      { key: 'analysis', label: 'Analysis' },
-                      { key: 'exploitation', label: 'Exploitation' },
-                      { key: 'post_exploitation', label: 'Post-Exploitation' },
-                      { key: 'reporting', label: 'Reporting' },
-                    ] as { key: typeof phaseOrder[number]; label: string }[]
-                  ).map(({ key, label }) => {
-                    const current = (flow?.phase ?? 'recon') === key
-                    const currentIdx = phaseOrder.indexOf((flow?.phase ?? 'recon') as typeof phaseOrder[number])
-                    const thisIdx = phaseOrder.indexOf(key)
-                    const done = flow?.status === 'completed' || thisIdx < currentIdx
-                    return (
-                      <li
-                        key={key}
-                        className={`text-xs font-mono py-0.5 pl-2 border-l-2 ${
-                          current
-                            ? 'border-accent text-foreground font-medium'
-                            : done
-                              ? 'border-surface-3 text-muted'
-                              : 'border-surface-3 text-muted/70'
-                        }`}
-                      >
-                        {current ? '▸ ' : done ? '✓ ' : '· '}
-                        {label}
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 pt-2 border-t border-border">
-                <div className="space-y-0.5">
-                  <DataLabel>CURRENT</DataLabel>
-                  <p className="text-xs font-mono text-foreground">{flow?.phase ?? '—'}</p>
-                </div>
-                <div className="space-y-0.5">
-                  <DataLabel>PATH</DataLabel>
-                  <p className="text-xs font-mono text-foreground truncate" title={flow?.attack_path ?? ''}>
-                    {flow?.attack_path ?? 'unclassified'}
-                  </p>
-                </div>
-                <div className="space-y-0.5 col-span-2">
-                  <DataLabel>STARTED</DataLabel>
-                  <p className="text-xs font-mono text-foreground">{formatTimestamp(flow?.started_at)}</p>
-                </div>
-                <div className="space-y-0.5 col-span-2">
-                  <DataLabel>ENDED</DataLabel>
-                  <p className="text-xs font-mono text-foreground">{formatTimestamp(flow?.completed_at)}</p>
-                </div>
-                <div className="space-y-0.5 col-span-2">
-                  <DataLabel>STATUS</DataLabel>
-                  <StatusBadge status={flow?.status ?? 'pending'} />
-                </div>
-              </div>
-            </div>
-          </Panel>
-        </section>
-
-        <section className="lg:w-[280px] xl:w-[320px] shrink-0 flex flex-col overflow-auto">
-          <Panel title="EVOGRAPH" className="flex-1 flex flex-col min-h-0 rounded-none">
-            <div className="flex-1 min-h-[400px] p-2 flex items-center justify-center">
-              <GraphVisualization
-                nodes={graphNodes}
-                edges={graphEdges}
-                width={280}
-                height={400}
-              />
-            </div>
-          </Panel>
-        </section>
-      </main>
-
-      {/* Approval Dialog */}
-      <ApprovalDialog
-        approval={pendingApproval}
-        onApprove={handleApprove}
-        onReject={handleReject}
-      />
-    </PageContentShell>
+        </CardContent>
+      </Card>
+    </PageShell>
   )
 }

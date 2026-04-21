@@ -1,194 +1,447 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import * as React from 'react'
 import Link from 'next/link'
-import { PlusOutlined } from '@ant-design/icons'
-import { projects as projectsApi, flows as flowsApi, activity as activityApi } from '@/lib/api'
-import type { Project, Flow } from '@/types'
-import { StatCard } from '@/components/ui/StatCard'
-import { Panel } from '@/components/ui/Panel'
-import { Button } from '@/components/ui/Button'
-import { EmptyState } from '@/components/ui/EmptyState'
-import { Skeleton } from '@/components/ui/Skeleton'
-import { StatusBadge } from '@/components/ui/StatusBadge'
-import { PageContentShell } from '@/components/layout/PageContentShell'
+import useSWR from 'swr'
+import {
+  Activity,
+  ArrowUpRight,
+  FolderKanban,
+  Plus,
+  ShieldCheck,
+  Workflow,
+  Zap,
+} from 'lucide-react'
 
-interface ActivityItem {
-  id: string
-  type: string
-  description: string
-  created_at: string
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { StatusDot } from '@/components/ui/status-dot'
+import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
+import { StatCard } from '@/components/dashboard/stat-card'
+import { projects, activity, health } from '@/lib/api'
+import { STATUS_CLASSES, STATUS_LABEL, PHASE_LABEL } from '@/lib/constants'
+import type { Project, Flow } from '@/types'
+import { timeAgo, cn } from '@/lib/utils'
+
+/**
+ * Dashboard — the landing page after sign-in.
+ *
+ *   ┌───────────────────────────────────────────────────────────┐
+ *   │  Greeting   + primary CTA                                 │
+ *   │  ── hero stats strip ────────────────────────────────     │
+ *   │  ┌─── Recent flows ──┐   ┌─── Provider health ──┐         │
+ *   │  │  timeline list    │   │  live status rows    │         │
+ *   │  └───────────────────┘   └──────────────────────┘         │
+ *   │  ── Recent activity ────                                  │
+ *   └───────────────────────────────────────────────────────────┘
+ */
+export default function DashboardPage() {
+  const { data: projectsData, isLoading: projectsLoading } = useSWR(
+    '/api/projects',
+    () => projects.list().then((r) => r.data as Project[]),
+    { refreshInterval: 30_000 },
+  )
+  const { data: activityData, isLoading: activityLoading } = useSWR(
+    '/api/activity',
+    () => activity.list().then((r) => r.data as ActivityEvent[]),
+    { refreshInterval: 15_000 },
+  )
+  const { data: healthData } = useSWR(
+    '/api/health/all',
+    () => health.all().then((r) => r.data as HealthSnapshot),
+    { refreshInterval: 30_000 },
+  )
+
+  const projectList = projectsData ?? []
+  const events = activityData ?? []
+  const flows = extractRecentFlows(events)
+  const runningCount = flows.filter((f) => f.status === 'running').length
+  const pendingApprovals = events.filter(
+    (e) => e.type === 'approval_request' && e.status === 'pending',
+  ).length
+
+  return (
+    <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
+      {/* ── Greeting + CTA ───────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <div className="text-2xs uppercase tracking-widest text-accent font-mono mb-2 inline-flex items-center gap-2">
+            <StatusDot tone="accent" pulse size={5} />
+            Operator dashboard
+          </div>
+          <h1 className="text-3xl lg:text-4xl tracking-tighter font-medium text-fg">
+            Welcome back.
+          </h1>
+          <p className="mt-2 text-sm text-fg-muted max-w-xl">
+            Resume an engagement, launch a new flow, or review pending approvals. Every
+            action is audit-logged and attributed to your account.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/projects/new">
+            <Button variant="primary" size="md" leftIcon={<Plus />}>
+              New project
+            </Button>
+          </Link>
+          <Link href="/flows">
+            <Button variant="secondary" size="md" rightIcon={<ArrowUpRight />}>
+              View flows
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Hero stats strip ─────────────────────────────────────────────── */}
+      <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          index={0}
+          label="Projects"
+          value={projectList.length}
+          icon={FolderKanban}
+          hint="Total engagements"
+        />
+        <StatCard
+          index={1}
+          label="Running flows"
+          value={runningCount}
+          icon={Workflow}
+          delta={runningCount > 0 ? 'live' : undefined}
+          deltaTone={runningCount > 0 ? 'accent' : 'muted'}
+          hint={runningCount === 1 ? '1 active pipeline' : `${runningCount} active pipelines`}
+        />
+        <StatCard
+          index={2}
+          label="Pending approvals"
+          value={pendingApprovals}
+          icon={ShieldCheck}
+          deltaTone={pendingApprovals > 0 ? 'danger' : 'muted'}
+          delta={pendingApprovals > 0 ? 'action required' : undefined}
+          hint="Phase-gate queue"
+        />
+        <StatCard
+          index={3}
+          label="Provider health"
+          value={providerHealthScore(healthData)}
+          icon={Zap}
+          hint="Online LLM + MCP"
+        />
+      </div>
+
+      {/* ── Main grid ────────────────────────────────────────────────────── */}
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
+        {/* Recent flows */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-sm">Recent flows</CardTitle>
+            <Link
+              href="/flows"
+              className="inline-flex items-center gap-1 text-2xs font-mono uppercase tracking-widest text-fg-subtle hover:text-fg transition-colors duration-120"
+            >
+              View all
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            {activityLoading ? (
+              <FlowListSkeleton />
+            ) : flows.length === 0 ? (
+              <EmptyState
+                icon={Workflow}
+                title="No flows yet"
+                description="Launch your first engagement to see pipeline activity here."
+                cta={{ href: '/projects/new', label: 'Create project' }}
+              />
+            ) : (
+              <ul className="divide-y divide-border-subtle">
+                {flows.slice(0, 6).map((flow) => (
+                  <FlowRow key={flow.id} flow={flow} />
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Provider + MCP health */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">System health</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <HealthPanel data={healthData} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Recent activity ──────────────────────────────────────────────── */}
+      <Card className="mt-4">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-sm">Recent activity</CardTitle>
+          <Link
+            href="/activity"
+            className="inline-flex items-center gap-1 text-2xs font-mono uppercase tracking-widest text-fg-subtle hover:text-fg transition-colors duration-120"
+          >
+            Full log
+            <ArrowUpRight className="h-3 w-3" />
+          </Link>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {activityLoading ? (
+            <ActivitySkeleton />
+          ) : events.length === 0 ? (
+            <div className="py-8 text-center text-xs text-fg-subtle">
+              No recent activity.
+            </div>
+          ) : (
+            <ul className="flex flex-col">
+              {events.slice(0, 8).map((e) => (
+                <ActivityRow key={e.id} event={e} />
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Projects preview */}
+      {!projectsLoading && projectList.length > 0 && (
+        <Card className="mt-4">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-sm">Projects</CardTitle>
+            <Link
+              href="/projects"
+              className="inline-flex items-center gap-1 text-2xs font-mono uppercase tracking-widest text-fg-subtle hover:text-fg transition-colors duration-120"
+            >
+              Manage
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {projectList.slice(0, 6).map((p) => (
+                <ProjectTile key={p.id} project={p} />
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
 }
 
-export default function DashboardPage() {
-  const [projectList, setProjectList] = useState<Project[]>([])
-  const [allFlows, setAllFlows] = useState<Flow[]>([])
-  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([])
-  const [loading, setLoading] = useState(true)
+/* ────────────────────────────────────────────────────────────────────────── */
+/*   Sub-components                                                           */
+/* ────────────────────────────────────────────────────────────────────────── */
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const projRes = await projectsApi.list()
-        const projData = projRes.data
-        const list: Project[] = Array.isArray(projData)
-          ? projData
-          : projData?.data ?? projData?.projects ?? []
-        setProjectList(list)
-
-        const flowResults = await Promise.allSettled(
-          list.map((p) => flowsApi.list(p.id))
-        )
-        const flows: Flow[] = flowResults.flatMap((r) => {
-          if (r.status !== 'fulfilled') return []
-          const d = r.value.data
-          return Array.isArray(d) ? d : d?.data ?? d?.flows ?? []
-        })
-        setAllFlows(flows)
-
-        try {
-          const actRes = await activityApi.list()
-          const actData = actRes.data
-          const items: ActivityItem[] = Array.isArray(actData)
-            ? actData
-            : actData?.data ?? actData?.activity ?? []
-          setActivityFeed(items.slice(0, 10))
-        } catch {
-          // Activity feed is non-critical; ignore errors
-        }
-      } catch {
-        setProjectList([])
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
-
-  const activeFlows = allFlows.filter((f) => f.status === 'running' || f.status === 'paused').length
-  const pendingApprovals = allFlows.filter((f) => f.status === 'paused').length
-
-  const flowsByProject = allFlows.reduce<Record<string, number>>((acc, f) => {
-    acc[f.project_id] = (acc[f.project_id] ?? 0) + 1
-    return acc
-  }, {})
-
-  if (loading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} variant="stat" />
-          ))}
+function FlowRow({ flow }: { flow: FlowSummary }) {
+  const styles = STATUS_CLASSES[flow.status]
+  return (
+    <li>
+      <Link
+        href={`/flows/${flow.id}`}
+        className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-bg-subtle/60 transition-colors duration-120"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span
+            className={cn(
+              'inline-flex h-7 w-7 items-center justify-center rounded-md border',
+              styles.border,
+              styles.bg,
+            )}
+          >
+            <StatusDot tone={flow.status === 'running' ? 'accent' : 'muted'} pulse={styles.pulse} size={6} />
+          </span>
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-fg truncate">{flow.name}</div>
+            <div className="mt-0.5 text-2xs text-fg-subtle font-mono">
+              {PHASE_LABEL[flow.phase]} · {timeAgo(flow.updated_at)}
+            </div>
+          </div>
         </div>
-        <Skeleton variant="card" className="h-48" />
-        <Skeleton variant="card" className="h-32" />
+        <Badge variant="outline" className={cn(styles.text, styles.border)}>
+          {STATUS_LABEL[flow.status]}
+        </Badge>
+      </Link>
+    </li>
+  )
+}
+
+function ProjectTile({ project }: { project: Project }) {
+  return (
+    <li>
+      <Link
+        href={`/projects/${project.id}`}
+        className="group block rounded-md border border-border bg-bg-subtle/30 p-3 hover:bg-bg-subtle/60 hover:border-border-strong transition-colors duration-120"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-medium text-fg truncate">{project.name}</div>
+          <ArrowUpRight className="h-3 w-3 text-fg-subtle group-hover:text-fg transition-colors duration-120" />
+        </div>
+        <div className="mt-1 text-2xs text-fg-subtle font-mono truncate">
+          {project.description || 'No description'}
+        </div>
+        <div className="mt-2 text-2xs text-fg-subtle font-mono uppercase tracking-widest">
+          {timeAgo(project.updated_at)}
+        </div>
+      </Link>
+    </li>
+  )
+}
+
+function HealthPanel({ data }: { data?: HealthSnapshot }) {
+  const providers = data?.providers ?? []
+  const mcp = data?.mcp ?? []
+  const rows = [
+    ...providers.map((p) => ({ name: p.name, online: p.online, group: 'LLM' })),
+    ...mcp.map((m) => ({ name: m.name, online: m.online, group: 'MCP' })),
+  ]
+  if (rows.length === 0) {
+    return (
+      <div className="py-4 text-xs text-fg-subtle">
+        Health data unavailable.
       </div>
     )
   }
-
   return (
-    <PageContentShell>
-    <div className="animate-fade-in space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="page-title">Dashboard</h1>
-        <p className="page-subtitle">Pentagron mission control overview</p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="PROJECTS" value={projectList.length} accent="emerald" />
-        <StatCard label="ACTIVE FLOWS" value={activeFlows} accent="blue" />
-        <StatCard label="PENDING APPROVALS" value={pendingApprovals} accent="amber" />
-        <StatCard label="TOTAL FLOWS" value={allFlows.length} accent="red" />
-      </div>
-
-      {/* Active engagements */}
-      <Panel
-        title="Active Engagements"
-        headerRight={
-          <Link href="/projects/new">
-            <Button variant="primary" size="sm" icon={<PlusOutlined />}>
-              New Project
-            </Button>
-          </Link>
-        }
-      >
-        {projectList.length === 0 ? (
-          <EmptyState
-            title="No active engagements"
-            description="Create your first project to begin autonomous pentesting"
-            action={
-              <Link href="/projects/new">
-                <Button variant="primary" icon={<PlusOutlined />}>
-                  New Project
-                </Button>
-              </Link>
-            }
-          />
-        ) : (
-          <div>
-            {/* Header row */}
-            <div className="grid grid-cols-[2fr_2fr_1fr_1fr] gap-4 px-4 py-2.5 border-b border-border">
-              <span className="panel-header-text">Name</span>
-              <span className="panel-header-text">Scope</span>
-              <span className="panel-header-text">Flows</span>
-              <span className="panel-header-text">Status</span>
+    <ul className="flex flex-col">
+      {rows.map((r, i) => (
+        <li key={`${r.group}-${r.name}-${i}`}>
+          {i > 0 && <Separator className="my-2" />}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <StatusDot
+                tone={r.online ? 'accent' : 'danger'}
+                pulse={r.online}
+                size={6}
+              />
+              <span className="text-xs text-fg truncate">{r.name}</span>
             </div>
-
-            {/* Project rows */}
-            {projectList.map((project) => {
-              const flowCount = flowsByProject[project.id] ?? 0
-              const hasActive = allFlows.some(
-                (f) => f.project_id === project.id && (f.status === 'running' || f.status === 'paused')
-              )
-              return (
-                <Link
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  className="grid grid-cols-[2fr_2fr_1fr_1fr] gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-surface-2 transition-colors cursor-pointer items-center"
-                >
-                  <span className="text-sm font-mono text-foreground truncate">
-                    {project.name}
-                  </span>
-                  <span className="text-xs font-mono text-muted truncate">
-                    {project.scope || '--'}
-                  </span>
-                  <span className="text-xs font-mono text-muted">
-                    {flowCount}
-                  </span>
-                  <StatusBadge status={hasActive ? 'running' : 'pending'} variant="flow" />
-                </Link>
-              )
-            })}
+            <span className="text-2xs font-mono uppercase tracking-widest text-fg-subtle">
+              {r.group} · {r.online ? 'online' : 'offline'}
+            </span>
           </div>
-        )}
-      </Panel>
-
-      {/* Recent activity */}
-      <Panel title="Recent Activity">
-        {activityFeed.length === 0 ? (
-          <p className="text-muted text-xs font-mono">No recent activity</p>
-        ) : (
-          <ul className="space-y-2">
-            {activityFeed.map((item) => (
-              <li key={item.id} className="text-xs font-mono border-b border-border pb-2 last:border-0">
-                <span className="text-muted">
-                  {new Date(item.created_at).toLocaleString('en-US', {
-                    month: 'short',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-                <span className="text-foreground ml-2">{item.description}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
-    </div>
-    </PageContentShell>
+        </li>
+      ))}
+    </ul>
   )
+}
+
+function ActivityRow({ event }: { event: ActivityEvent }) {
+  return (
+    <li className="flex items-start gap-3 py-2.5 border-b border-border-subtle/60 last:border-b-0">
+      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-fg-subtle/60" />
+      <div className="min-w-0 flex-1">
+        <div className="text-xs text-fg truncate">{event.message}</div>
+        <div className="mt-0.5 text-2xs text-fg-subtle font-mono">
+          {timeAgo(event.created_at)}
+          {event.actor ? ` · ${event.actor}` : ''}
+        </div>
+      </div>
+      <Badge variant="outline" className="text-2xs uppercase">{event.type}</Badge>
+    </li>
+  )
+}
+
+function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  cta,
+}: {
+  icon: typeof FolderKanban
+  title: string
+  description: string
+  cta?: { href: string; label: string }
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center gap-3 py-10 px-6">
+      <div className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-bg-subtle">
+        <Icon className="h-4 w-4 text-fg-subtle" />
+      </div>
+      <div>
+        <div className="text-sm font-medium text-fg">{title}</div>
+        <div className="mt-1 text-xs text-fg-muted max-w-sm">{description}</div>
+      </div>
+      {cta && (
+        <Link href={cta.href}>
+          <Button variant="secondary" size="sm" rightIcon={<ArrowUpRight />}>
+            {cta.label}
+          </Button>
+        </Link>
+      )}
+    </div>
+  )
+}
+
+function FlowListSkeleton() {
+  return (
+    <div className="flex flex-col divide-y divide-border-subtle">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex items-center gap-3 px-4 py-3">
+          <Skeleton className="h-7 w-7 rounded-md" />
+          <div className="flex-1 min-w-0">
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-2.5 w-32 mt-2" />
+          </div>
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ActivitySkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="flex items-center gap-3 py-2">
+          <Skeleton className="h-1.5 w-1.5 rounded-full" />
+          <Skeleton className="h-3 flex-1" />
+          <Skeleton className="h-4 w-16 rounded-full" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*   Types + helpers                                                          */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+type FlowSummary = Pick<Flow, 'id' | 'name' | 'status' | 'phase' | 'updated_at'> & {
+  project_id?: string
+}
+
+type ActivityEvent = {
+  id: string
+  type: string
+  message: string
+  status?: string
+  actor?: string
+  created_at: string
+  flow?: FlowSummary
+}
+
+type HealthSnapshot = {
+  providers?: { name: string; online: boolean }[]
+  mcp?: { name: string; online: boolean }[]
+}
+
+function extractRecentFlows(events: ActivityEvent[]): FlowSummary[] {
+  const seen = new Set<string>()
+  const out: FlowSummary[] = []
+  for (const e of events) {
+    if (!e.flow) continue
+    if (seen.has(e.flow.id)) continue
+    seen.add(e.flow.id)
+    out.push(e.flow)
+  }
+  return out
+}
+
+function providerHealthScore(data?: HealthSnapshot): string {
+  const all = [...(data?.providers ?? []), ...(data?.mcp ?? [])]
+  if (all.length === 0) return '—'
+  const online = all.filter((x) => x.online).length
+  return `${online}/${all.length}`
 }

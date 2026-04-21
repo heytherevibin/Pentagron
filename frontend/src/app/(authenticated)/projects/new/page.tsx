@@ -1,109 +1,218 @@
 'use client'
 
-import { useState } from 'react'
+import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import toast from 'react-hot-toast'
-import { projects } from '@/lib/api'
-import { Panel } from '@/components/ui/Panel'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
-import { TagInput } from '@/components/ui/TagInput'
-import { Button } from '@/components/ui/Button'
-import { PageContentShell } from '@/components/layout/PageContentShell'
+import { AnimatePresence, motion } from 'framer-motion'
+import { AlertTriangle, ArrowRight, Target } from 'lucide-react'
+import { toast } from 'sonner'
 
+import { Button } from '@/components/ui/button'
+import { Input, Textarea } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageHeader, PageShell } from '@/components/shell/page-header'
+import { projects } from '@/lib/api'
+
+/**
+ * New project — minimal three-field form: name, description, scope. Scope is
+ * the freeform definition of what's in-bounds for the engagement (one line
+ * per target / CIDR / URL). Written to the backend verbatim.
+ */
 export default function NewProjectPage() {
   const router = useRouter()
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [tags, setTags] = useState<string[]>([])
-  const [submitting, setSubmitting] = useState(false)
+  const [name, setName] = React.useState('')
+  const [description, setDescription] = React.useState('')
+  const [scope, setScope] = React.useState('')
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
+  const nameRef = React.useRef<HTMLInputElement>(null)
+  React.useEffect(() => {
+    nameRef.current?.focus()
+  }, [])
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!name.trim()) return
-
-    setSubmitting(true)
+    if (loading) return
+    setError(null)
+    setLoading(true)
     try {
-      const res = await projects.create({
+      const { data } = await projects.create({
         name: name.trim(),
-        description: description.trim(),
-        scope: tags.join(', '),
+        description: description.trim() || undefined,
+        scope: scope.trim() || undefined,
       })
-      const id = res.data?.id ?? res.data?.data?.id
-      if (!id) {
-        toast.error('Invalid response: no project id')
-        return
+      const created = (data as { project?: { id: string } }).project
+      toast.success('Project created', { description: name })
+      if (created?.id) {
+        router.replace(`/projects/${created.id}`)
+      } else {
+        router.replace('/projects')
       }
-      toast.success('Project initialized')
-      router.push(`/projects/${id}`)
-    } catch (err: unknown) {
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string; message?: string } }; message?: string }
       const msg =
-        err && typeof err === 'object' && err !== null && 'response' in err
-          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-          : null
-      toast.error(msg && typeof msg === 'string' ? msg : 'Failed to create project')
-    } finally {
-      setSubmitting(false)
+        e.response?.data?.error ??
+        e.response?.data?.message ??
+        e.message ??
+        'Could not create project. Try again.'
+      setError(msg)
+      setLoading(false)
     }
   }
 
   return (
-    <PageContentShell>
-      <div className="animate-fade-in space-y-6">
-        {/* Page header — same structure as project detail */}
-        <div>
-          <h1 className="page-title">New Engagement</h1>
-          <p className="page-subtitle">Configure a new penetration testing project</p>
+    <PageShell>
+      <PageHeader
+        backHref="/projects"
+        backLabel="All projects"
+        eyebrow="New engagement"
+        title="Create a project"
+        subtitle="Scope the engagement, assign targets, and invite your flows."
+      />
+
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-6 max-w-[1040px]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Project details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={onSubmit} className="flex flex-col gap-5" noValidate>
+              <AnimatePresence initial={false}>
+                {error && (
+                  <motion.div
+                    key="error"
+                    initial={{ opacity: 0, y: -4, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -4, height: 0 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex items-start gap-2.5 rounded-md border border-sev-critical/30 bg-sev-critical/5 px-3 py-2.5">
+                      <AlertTriangle className="h-3.5 w-3.5 text-sev-critical mt-0.5 shrink-0" />
+                      <div className="text-xs leading-relaxed text-sev-critical/90">{error}</div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="name" hint="required">
+                  Name
+                </Label>
+                <Input
+                  ref={nameRef}
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="ACME · Q2 external assessment"
+                  size="md"
+                  disabled={loading}
+                  required
+                  maxLength={120}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Objectives, stakeholders, rules of engagement…"
+                  disabled={loading}
+                  rows={3}
+                  maxLength={2000}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="scope" hint="one target per line">
+                  Scope
+                </Label>
+                <Textarea
+                  id="scope"
+                  value={scope}
+                  onChange={(e) => setScope(e.target.value)}
+                  placeholder={'example.com\n*.staging.example.com\n203.0.113.0/24'}
+                  disabled={loading}
+                  rows={6}
+                  className="font-mono text-xs"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="text-xs text-fg-muted hover:text-fg transition-colors duration-120"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  loading={loading}
+                  rightIcon={!loading ? <ArrowRight /> : undefined}
+                  disabled={loading || !name.trim()}
+                >
+                  {loading ? 'Creating…' : 'Create project'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Side panel — authorised-use reminder */}
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Target className="h-3.5 w-3.5 text-accent" />
+                Scope matters
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 text-xs leading-relaxed text-fg-muted">
+              Pentagron agents will refuse to act on anything outside this list. Every
+              in-scope target you add is treated as authorised — make sure you have
+              written permission before including it.
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">What happens next</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ol className="flex flex-col gap-2.5 text-xs text-fg-muted">
+                <NextStep num={1} label="Create the project" done />
+                <NextStep num={2} label="Launch a flow from the project page" />
+                <NextStep num={3} label="Approve phase gates as they appear" />
+                <NextStep num={4} label="Review the final report & EvoGraph" />
+              </ol>
+            </CardContent>
+          </Card>
         </div>
-
-        {/* Single full-width panel — matches PROJECT INFO / ENGAGEMENT FLOWS layout */}
-        <form onSubmit={handleSubmit}>
-          <Panel title="PROJECT CONFIGURATION" contentClassName="space-y-5">
-            <Input
-              label="PROJECT NAME"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Client-A External Penetration Test"
-            />
-
-            <Textarea
-              label="DESCRIPTION"
-              rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Full external penetration test for..."
-            />
-
-            <TagInput
-              label="TARGET SCOPE"
-              tags={tags}
-              onAdd={(tag) => setTags((prev) => [...prev, tag])}
-              onRemove={(tag) => setTags((prev) => prev.filter((t) => t !== tag))}
-              placeholder="*.example.com, 10.0.0.0/24"
-            />
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
-              <Button
-                type="button"
-                variant="ghost"
-                size="md"
-                onClick={() => router.back()}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                size="md"
-                loading={submitting}
-              >
-                Initialize Project
-              </Button>
-            </div>
-          </Panel>
-        </form>
       </div>
-    </PageContentShell>
+    </PageShell>
+  )
+}
+
+function NextStep({ num, label, done }: { num: number; label: string; done?: boolean }) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <span
+        className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-2xs font-mono shrink-0 ${
+          done
+            ? 'bg-accent/10 border-accent/40 text-accent'
+            : 'bg-bg-muted border-border text-fg-subtle'
+        }`}
+      >
+        {num}
+      </span>
+      <span className={done ? 'text-fg' : undefined}>{label}</span>
+    </li>
   )
 }
