@@ -141,7 +141,18 @@ func CreateProject(d *Deps) gin.HandlerFunc {
 			Scope:       body.Scope,
 			OwnerID:     ownerID,
 		}
-		if err := d.DB.Create(&proj).Error; err != nil {
+		// Use an application-generated UUID + portable SQL so tests can run on SQLite.
+		// Postgres still happily accepts UUID strings for uuid-typed columns.
+		proj.ID = uuid.New()
+		if err := d.DB.Exec(
+			"INSERT INTO projects (id, name, description, scope, settings, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, COALESCE(?, '{}'), ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+			proj.ID.String(),
+			proj.Name,
+			proj.Description,
+			proj.Scope,
+			proj.Settings,
+			proj.OwnerID.String(),
+		).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -193,7 +204,7 @@ func UpdateProject(d *Deps) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		d.DB.Exec("UPDATE projects SET updated_at = NOW() WHERE id = ?", id)
+		d.DB.Exec("UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", id)
 		c.JSON(http.StatusOK, gin.H{"id": id})
 	}
 }
@@ -217,7 +228,7 @@ func DeleteProject(d *Deps) gin.HandlerFunc {
 			return
 		}
 
-		d.DB.Exec("UPDATE projects SET deleted_at = NOW() WHERE id = ?", id)
+		d.DB.Exec("UPDATE projects SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?", id)
 		c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 	}
 }
@@ -229,7 +240,7 @@ func isProjectOwnerOrAdmin(c *gin.Context, project map[string]interface{}) bool 
 		return true
 	}
 	userID, _ := c.Get("user_id")
-	ownerID, _ := project["owner_id"]
+	ownerID := project["owner_id"]
 	return userID == ownerID
 }
 

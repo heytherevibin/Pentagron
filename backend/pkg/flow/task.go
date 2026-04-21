@@ -2,7 +2,6 @@ package flow
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -228,13 +227,4 @@ func ModelForPhase(agentType agent.AgentType, cfg *config.Config) string {
 		return override
 	}
 	return agent.ModelForAgent(agentType)
-}
-
-// encodeJSON is a helper to marshal a value or return an empty object on failure.
-func encodeJSON(v interface{}) string {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return "{}"
-	}
-	return string(b)
 }

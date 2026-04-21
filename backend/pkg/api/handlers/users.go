@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -80,11 +81,11 @@ func CreateUser(d *Deps) gin.HandlerFunc {
 			return
 		}
 
-		var newID string
-		if err := d.DB.Raw(
-			"INSERT INTO users (id, email, password, role, created_at, updated_at) VALUES (gen_random_uuid(), ?, ?, ?, NOW(), NOW()) RETURNING id",
-			body.Email, string(hashed), body.Role,
-		).Scan(&newID).Error; err != nil {
+		newID := uuid.New().String()
+		if err := d.DB.Exec(
+			"INSERT INTO users (id, email, password, role, created_at, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+			newID, body.Email, string(hashed), body.Role,
+		).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -110,7 +111,7 @@ func UpdateUser(d *Deps) gin.HandlerFunc {
 			return
 		}
 
-		result := d.DB.Exec("UPDATE users SET role = ?, updated_at = NOW() WHERE id = ? AND deleted_at IS NULL", body.Role, id)
+		result := d.DB.Exec("UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL", body.Role, id)
 		if result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 			return
@@ -129,7 +130,7 @@ func DeactivateUser(d *Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("user_id")
 
-		result := d.DB.Exec("UPDATE users SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL", id)
+		result := d.DB.Exec("UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL", id)
 		if result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 			return
@@ -162,7 +163,7 @@ func ResetPassword(d *Deps) gin.HandlerFunc {
 			return
 		}
 
-		result := d.DB.Exec("UPDATE users SET password = ?, updated_at = NOW() WHERE id = ? AND deleted_at IS NULL", string(hashed), id)
+		result := d.DB.Exec("UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL", string(hashed), id)
 		if result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 			return

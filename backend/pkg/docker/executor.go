@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"go.uber.org/zap"
@@ -43,7 +42,7 @@ func (e *Executor) Exec(ctx context.Context, command string, timeoutSecs int) (s
 	cli := e.docker.Inner()
 
 	// Create exec instance
-	execCreate, err := cli.ContainerExecCreate(execCtx, e.containerName, types.ExecConfig{
+	execCreate, err := cli.ContainerExecCreate(execCtx, e.containerName, container.ExecOptions{
 		AttachStdout: true,
 		AttachStderr: true,
 		Cmd:          []string{"/bin/bash", "-c", command},
@@ -53,7 +52,7 @@ func (e *Executor) Exec(ctx context.Context, command string, timeoutSecs int) (s
 	}
 
 	// Attach and stream output
-	resp, err := cli.ContainerExecAttach(execCtx, execCreate.ID, types.ExecStartCheck{})
+	resp, err := cli.ContainerExecAttach(execCtx, execCreate.ID, container.ExecAttachOptions{})
 	if err != nil {
 		return "", fmt.Errorf("docker exec attach: %w", err)
 	}

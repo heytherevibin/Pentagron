@@ -192,5 +192,5 @@ func (l *LangfuseClient) flush(ctx context.Context, events []langfuseEvent) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 }

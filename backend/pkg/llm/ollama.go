@@ -40,7 +40,7 @@ func (p *OllamaProvider) HealthCheck(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("ollama health: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("ollama health: status %d", resp.StatusCode)
 	}
@@ -53,7 +53,7 @@ func (p *OllamaProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ollama list models: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var result struct {
 		Models []struct {
@@ -90,7 +90,7 @@ func (p *OllamaProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 	if err != nil {
 		return nil, fmt.Errorf("ollama chat: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	data, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
@@ -142,7 +142,7 @@ func (p *OllamaProvider) ChatStream(ctx context.Context, req ChatRequest, ch cha
 		ch <- StreamChunk{Error: err, Done: true}
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	decoder := json.NewDecoder(resp.Body)
 	for decoder.More() {

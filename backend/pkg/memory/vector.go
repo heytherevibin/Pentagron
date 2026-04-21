@@ -69,7 +69,7 @@ func (v *VectorStore) Search(ctx context.Context, projectID string, storeType St
 	if err != nil {
 		return nil, fmt.Errorf("vector search: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []MemoryEntry
 	for rows.Next() {

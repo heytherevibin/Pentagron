@@ -66,7 +66,7 @@ func GetFlowGraph(d *Deps) gin.HandlerFunc {
 		// Query Neo4j for the attack chain and all connected nodes
 		ctx := c.Request.Context()
 		neo4jSession := d.MemMgr.EvoGraph.Neo4jDriver().NewSession(ctx, neoReadConfig())
-		defer neo4jSession.Close(ctx)
+		defer func() { _ = neo4jSession.Close(ctx) }()
 
 		// Get all chain nodes and their children
 		result, err := neo4jSession.Run(ctx, `

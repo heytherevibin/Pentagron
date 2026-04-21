@@ -25,7 +25,7 @@ func maskKey(key string) string {
 // persistSetting writes a single key/value pair to the settings table using upsert.
 func persistSetting(d *Deps, key, value string) error {
 	return d.DB.Exec(
-		"INSERT INTO settings (key, value, updated_at) VALUES (?, ?, NOW()) ON CONFLICT (key) DO UPDATE SET value = ?, updated_at = NOW()",
+		"INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT (key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP",
 		key, value, value,
 	).Error
 }
@@ -435,23 +435,23 @@ func GetHealthAll(d *Deps) gin.HandlerFunc {
 
 		// LLM providers
 		llmStatuses := d.LLMMgr.HealthCheck(ctx)
-		llmResult := make([]gin.H, 0, len(llmStatuses))
+		providers := make([]gin.H, 0, len(llmStatuses))
 		for provider, err := range llmStatuses {
-			entry := gin.H{"name": provider, "status": "ok"}
+			entry := gin.H{"name": provider, "online": true}
 			if err != nil {
-				entry["status"] = "error"
+				entry["online"] = false
 				entry["error"] = err.Error()
 			}
-			llmResult = append(llmResult, entry)
+			providers = append(providers, entry)
 		}
 
 		// MCP servers
 		mcpStatuses := d.MCPMgr.HealthCheck(ctx)
 		mcpResult := make([]gin.H, 0, len(mcpStatuses))
 		for server, err := range mcpStatuses {
-			entry := gin.H{"name": server, "status": "ok"}
+			entry := gin.H{"name": server, "online": true}
 			if err != nil {
-				entry["status"] = "error"
+				entry["online"] = false
 				entry["error"] = err.Error()
 			}
 			mcpResult = append(mcpResult, entry)
@@ -471,7 +471,7 @@ func GetHealthAll(d *Deps) gin.HandlerFunc {
 		dockerStatus := "unknown"
 
 		result := gin.H{
-			"llm":    llmResult,
+			"providers": providers,
 			"mcp":    mcpResult,
 			"database": gin.H{"status": dbStatus},
 			"docker":   gin.H{"status": dockerStatus},

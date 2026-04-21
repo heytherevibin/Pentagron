@@ -43,7 +43,7 @@ func generateTestCA(t *testing.T, dir string) (caPath string, caKey *ecdsa.Priva
 	path := filepath.Join(dir, "ca.pem")
 	f, _ := os.Create(path)
 	_ = pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-	f.Close()
+	_ = f.Close()
 
 	return path, key, cert
 }
@@ -74,12 +74,12 @@ func generateTestCert(t *testing.T, dir, name string, caKey *ecdsa.PrivateKey, c
 
 	fc, _ := os.Create(certPath)
 	_ = pem.Encode(fc, &pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-	fc.Close()
+	_ = fc.Close()
 
 	keyDER, _ := x509.MarshalECPrivateKey(key)
 	fk, _ := os.Create(keyPath)
 	_ = pem.Encode(fk, &pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
-	fk.Close()
+	_ = fk.Close()
 
 	return certPath, keyPath
 }

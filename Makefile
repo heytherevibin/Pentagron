@@ -1,6 +1,6 @@
 .PHONY: up down dev build rebuild logs test test-e2e lint migrate clean help
 
-COMPOSE        := docker-compose -f docker-compose.yml
+COMPOSE        := docker compose -f docker-compose.yml
 COMPOSE_DEV    := $(COMPOSE) -f docker-compose.dev.yml
 COMPOSE_OBS    := $(COMPOSE) -f docker-compose.observability.yml
 BACKEND_DIR    := ./backend
@@ -53,11 +53,13 @@ logs-frontend: ## Tail frontend logs
 	$(COMPOSE) logs -f pentagron-frontend
 
 ## ── Database ──────────────────────────────────────────────────────────────────
-migrate: ## Run database migrations
-	cd $(BACKEND_DIR) && go run ./cmd/migrate/...
+migrate: ## Run database migrations (handled automatically on backend startup via GORM AutoMigrate)
+	@echo "Migrations run automatically when the backend starts (GORM AutoMigrate in cmd/server/main.go)."
+	@echo "To force a re-migration, restart the backend: make down && make up"
 
-migrate-down: ## Roll back last migration
-	cd $(BACKEND_DIR) && go run ./cmd/migrate/... down
+migrate-down: ## Roll back last migration (not implemented — GORM AutoMigrate is forward-only)
+	@echo "GORM AutoMigrate is forward-only. To reset the database, run: make clean && make up"
+	@exit 1
 
 db-shell: ## Open psql shell
 	$(COMPOSE) exec postgres psql -U pentagron -d pentagron

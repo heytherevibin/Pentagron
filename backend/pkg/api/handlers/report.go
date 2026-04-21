@@ -36,13 +36,13 @@ func buildMarkdown(flow map[string]any, artifacts, actions []map[string]any) str
 
 	sb.WriteString("## Engagement Summary\n\n")
 	sb.WriteString("| Field | Value |\n|-------|-------|\n")
-	sb.WriteString(fmt.Sprintf("| **Flow** | %v |\n", flow["name"]))
-	sb.WriteString(fmt.Sprintf("| **Status** | %v |\n", flow["status"]))
-	sb.WriteString(fmt.Sprintf("| **Phase** | %v |\n", flow["phase"]))
-	sb.WriteString(fmt.Sprintf("| **Attack Path** | %v |\n", flow["attack_path"]))
-	sb.WriteString(fmt.Sprintf("| **Objective** | %v |\n", flow["objective"]))
-	sb.WriteString(fmt.Sprintf("| **Started** | %v |\n", flow["started_at"]))
-	sb.WriteString(fmt.Sprintf("| **Completed** | %v |\n", flow["completed_at"]))
+	fmt.Fprintf(&sb, "| **Flow** | %v |\n", flow["name"])
+	fmt.Fprintf(&sb, "| **Status** | %v |\n", flow["status"])
+	fmt.Fprintf(&sb, "| **Phase** | %v |\n", flow["phase"])
+	fmt.Fprintf(&sb, "| **Attack Path** | %v |\n", flow["attack_path"])
+	fmt.Fprintf(&sb, "| **Objective** | %v |\n", flow["objective"])
+	fmt.Fprintf(&sb, "| **Started** | %v |\n", flow["started_at"])
+	fmt.Fprintf(&sb, "| **Completed** | %v |\n", flow["completed_at"])
 	sb.WriteString("\n")
 
 	if len(artifacts) > 0 {
@@ -54,7 +54,7 @@ func buildMarkdown(flow map[string]any, artifacts, actions []map[string]any) str
 			if len(val) > 100 {
 				val = val[:100] + "..."
 			}
-			sb.WriteString(fmt.Sprintf("| %s | %v | %v | %s |\n", sev, a["type"], a["name"], val))
+			fmt.Fprintf(&sb, "| %s | %v | %v | %s |\n", sev, a["type"], a["name"], val)
 		}
 		sb.WriteString("\n")
 	} else {
@@ -69,8 +69,8 @@ func buildMarkdown(flow map[string]any, artifacts, actions []map[string]any) str
 			if s, valid := a["success"].(bool); valid && !s {
 				ok = "FAIL"
 			}
-			sb.WriteString(fmt.Sprintf("| %v | %v | %v | %s | %vms |\n",
-				a["created_at"], a["agent_type"], a["tool_name"], ok, a["duration_ms"]))
+			fmt.Fprintf(&sb, "| %v | %v | %v | %s | %vms |\n",
+				a["created_at"], a["agent_type"], a["tool_name"], ok, a["duration_ms"])
 		}
 		sb.WriteString("\n")
 	}

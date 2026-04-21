@@ -72,7 +72,7 @@ func (c *Neo4jClient) EnsureConstraints(ctx context.Context) error {
 	}
 
 	session := c.Session(ctx)
-	defer session.Close(ctx)
+	defer func() { _ = session.Close(ctx) }()
 
 	for _, cql := range constraints {
 		if _, err := session.Run(ctx, cql, nil); err != nil {

@@ -55,7 +55,7 @@ func (p *AnthropicProvider) ChatStream(ctx context.Context, req ChatRequest, ch 
 	params := p.buildParams(req)
 
 	stream := p.client.Messages.NewStreaming(ctx, params)
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	for stream.Next() {
 		event := stream.Current()

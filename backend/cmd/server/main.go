@@ -36,7 +36,7 @@ func main() {
 
 	// ── Logger ─────────────────────────────────────────────────────────────────
 	log := buildLogger(cfg.LogLevel)
-	defer log.Sync()
+	defer func() { _ = log.Sync() }()
 
 	log.Info("starting Pentagron backend",
 		zap.String("port", cfg.ServerPort),

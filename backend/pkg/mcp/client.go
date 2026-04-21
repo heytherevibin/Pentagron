@@ -98,7 +98,7 @@ func (c *Client) connectLocked(ctx context.Context) error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		cancel()
 		return fmt.Errorf("mcp %s: SSE status %d", c.serverName, resp.StatusCode)
 	}
@@ -115,12 +115,12 @@ func (c *Client) connectLocked(ctx context.Context) error {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		cancel()
 		return fmt.Errorf("mcp %s: read SSE endpoint: %w", c.serverName, err)
 	}
 	if endpoint == "" {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		cancel()
 		return fmt.Errorf("mcp %s: no endpoint received from SSE", c.serverName)
 	}
@@ -144,7 +144,7 @@ func (c *Client) connectLocked(ctx context.Context) error {
 	// When the connection drops, it marks the client as disconnected so the
 	// next RPC call triggers a reconnect.
 	go func() {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		for scanner.Scan() {
 			select {
 			case <-sseCtx.Done():
@@ -213,7 +213,7 @@ func (c *Client) doRPC(ctx context.Context, method string, params interface{}) (
 		c.mu.Unlock()
 		return nil, fmt.Errorf("mcp %s: http call: %w", c.serverName, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {

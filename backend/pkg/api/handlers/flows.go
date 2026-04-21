@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // checkFlowAccess verifies the user owns the parent project (or is an admin).
@@ -21,7 +22,7 @@ func checkFlowAccess(c *gin.Context, d *Deps, flowID string) map[string]interfac
 	role, _ := c.Get("user_role")
 	if role != "admin" {
 		userID, _ := c.Get("user_id")
-		ownerID, _ := flow["project_owner_id"]
+		ownerID := flow["project_owner_id"]
 		if userID != ownerID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
 			return nil
@@ -53,11 +54,11 @@ func CreateFlow(d *Deps) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		var newID string
-		if err := d.DB.Raw(
-			"INSERT INTO flows (id, project_id, name, objective, status, phase, created_at, updated_at) VALUES (gen_random_uuid(), ?, ?, ?, 'pending', 'recon', NOW(), NOW()) RETURNING id",
-			projectID, body.Name, body.Objective,
-		).Scan(&newID).Error; err != nil {
+		newID := uuid.New().String()
+		if err := d.DB.Exec(
+			"INSERT INTO flows (id, project_id, name, objective, status, phase, created_at, updated_at) VALUES (?, ?, ?, ?, 'pending', 'recon', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+			newID, projectID, body.Name, body.Objective,
+		).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -83,7 +84,7 @@ func DeleteFlow(d *Deps) gin.HandlerFunc {
 		if flow := checkFlowAccess(c, d, id); flow == nil {
 			return
 		}
-		result := d.DB.Exec("UPDATE flows SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL", id)
+		result := d.DB.Exec("UPDATE flows SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL", id)
 		if result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 			return
@@ -121,7 +122,7 @@ func CancelFlow(d *Deps) gin.HandlerFunc {
 			return
 		}
 		d.FlowEngine.Cancel(id)
-		if result := d.DB.Exec("UPDATE flows SET status = 'cancelled', updated_at = NOW() WHERE id = ? AND deleted_at IS NULL", id); result.Error != nil {
+		if result := d.DB.Exec("UPDATE flows SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL", id); result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 			return
 		}
@@ -158,7 +159,7 @@ func ApprovePhase(d *Deps) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if result := d.DB.Exec("UPDATE approval_requests SET status = 'approved', reviewed_at = NOW(), notes = ? WHERE id = ? AND flow_id = ?",
+		if result := d.DB.Exec("UPDATE approval_requests SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, notes = ? WHERE id = ? AND flow_id = ?",
 			body.Notes, body.ApprovalID, flowID); result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 			return
@@ -182,7 +183,7 @@ func RejectPhase(d *Deps) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		d.DB.Exec("UPDATE approval_requests SET status = 'rejected', reviewed_at = NOW(), notes = ? WHERE id = ? AND flow_id = ?",
+		d.DB.Exec("UPDATE approval_requests SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, notes = ? WHERE id = ? AND flow_id = ?",
 			body.Notes, body.ApprovalID, flowID)
 		d.FlowEngine.NotifyApproval(flowID)
 		c.JSON(http.StatusOK, gin.H{"message": "rejected"})

@@ -54,7 +54,7 @@ func main() {
 
 	logCfg := zap.NewProductionConfig()
 	log, _ := logCfg.Build()
-	defer log.Sync()
+	defer func() { _ = log.Sync() }()
 
 	if *workerID == "" {
 		h, _ := os.Hostname()
@@ -180,7 +180,7 @@ func pollTask(ctx context.Context, client *http.Client, server, id, token string
 		log.Warn("poll failed", zap.Error(err))
 		return nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var result struct {
 		Task *workerTask `json:"task"`
@@ -245,7 +245,7 @@ func doPost(ctx context.Context, client *http.Client, url, token string, body an
 	if err != nil {
 		return fmt.Errorf("http post: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if out != nil {
 		raw, _ := io.ReadAll(resp.Body)
 		return json.Unmarshal(raw, out)

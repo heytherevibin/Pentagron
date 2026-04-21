@@ -75,6 +75,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 			name TEXT NOT NULL,
 			description TEXT,
 			scope TEXT,
+			settings TEXT,
 			owner_id TEXT NOT NULL,
 			deleted_at DATETIME,
 			created_at DATETIME,
@@ -159,7 +160,7 @@ func seedAdmin(t *testing.T, db *gorm.DB) string {
 	t.Helper()
 	// bcrypt of "password" with cost 10 — pre-computed to keep tests fast
 	hash := "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi"
-	id := "admin-test-uuid-0001"
+	id := "00000000-0000-0000-0000-000000000001"
 	if err := db.Exec(
 		`INSERT INTO users (id, email, password, role, created_at, updated_at) VALUES (?, ?, ?, 'admin', datetime('now'), datetime('now'))`,
 		id, "admin@test.local", hash,
@@ -420,7 +421,7 @@ func TestFlowOwnershipIsolation(t *testing.T) {
 	r := setupRouter(t, db)
 
 	// Seed a second non-admin user directly
-	otherID := "other-user-uuid-0002"
+	otherID := "00000000-0000-0000-0000-000000000002"
 	otherHash := "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi"
 	db.Exec(`INSERT INTO users (id, email, password, role, created_at, updated_at) VALUES (?, 'other@test.local', ?, 'operator', datetime('now'), datetime('now'))`, otherID, otherHash)
 
@@ -499,8 +500,8 @@ func TestReportMarkdown(t *testing.T) {
 	tok := makeToken(t, adminID, "admin@test.local", "admin")
 
 	// Seed project + flow directly
-	projectID := "proj-report-test-0001"
-	flowID := "flow-report-test-0001"
+	projectID := "00000000-0000-0000-0000-000000000101"
+	flowID := "00000000-0000-0000-0000-000000000201"
 	db.Exec(`INSERT INTO projects (id, name, owner_id, created_at, updated_at) VALUES (?, 'Report Project', ?, datetime('now'), datetime('now'))`, projectID, adminID)
 	db.Exec(`INSERT INTO flows (id, project_id, name, objective, status, phase, created_at, updated_at) VALUES (?, ?, 'Report Flow', 'Test objective', 'completed', 'reporting', datetime('now'), datetime('now'))`, flowID, projectID)
 
@@ -527,8 +528,8 @@ func TestReportPDF(t *testing.T) {
 	r := setupRouter(t, db)
 	tok := makeToken(t, adminID, "admin@test.local", "admin")
 
-	projectID := "proj-pdf-test-0001"
-	flowID := "flow-pdf-test-0001"
+	projectID := "00000000-0000-0000-0000-000000000102"
+	flowID := "00000000-0000-0000-0000-000000000202"
 	db.Exec(`INSERT INTO projects (id, name, owner_id, created_at, updated_at) VALUES (?, 'PDF Project', ?, datetime('now'), datetime('now'))`, projectID, adminID)
 	db.Exec(`INSERT INTO flows (id, project_id, name, objective, status, phase, created_at, updated_at) VALUES (?, ?, 'PDF Flow', 'Test PDF', 'completed', 'reporting', datetime('now'), datetime('now'))`, flowID, projectID)
 

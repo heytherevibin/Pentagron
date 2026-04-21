@@ -79,7 +79,7 @@ func (e *EvoGraph) StartChain(ctx context.Context, sessionID, projectID, objecti
 
 	if e.neo4j != nil {
 		session := e.neo4j.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-		defer session.Close(ctx)
+		defer func() { _ = session.Close(ctx) }()
 
 		_, err := session.Run(ctx, `
 			CREATE (c:AttackChain {
@@ -208,7 +208,7 @@ func (e *EvoGraph) FormatContext(ctx context.Context) string {
 	if len(findings) > 0 {
 		sb.WriteString("=== CURRENT SESSION FINDINGS ===\n")
 		for _, f := range severitySorted(findings) {
-			sb.WriteString(fmt.Sprintf("[%s][%s] %s\n", strings.ToUpper(string(f.Severity)), f.Tool, f.Content))
+			fmt.Fprintf(&sb, "[%s][%s] %s\n", strings.ToUpper(string(f.Severity)), f.Tool, f.Content)
 		}
 		sb.WriteString("\n")
 	}
@@ -216,7 +216,7 @@ func (e *EvoGraph) FormatContext(ctx context.Context) string {
 	if len(failures) > 0 {
 		sb.WriteString("=== FAILED ATTEMPTS (DO NOT REPEAT) ===\n")
 		for _, f := range failures {
-			sb.WriteString(fmt.Sprintf("- %s\n", f.Lesson))
+			fmt.Fprintf(&sb, "- %s\n", f.Lesson)
 		}
 		sb.WriteString("\n")
 	}
@@ -224,7 +224,7 @@ func (e *EvoGraph) FormatContext(ctx context.Context) string {
 	if len(decisions) > 0 {
 		sb.WriteString("=== PHASE DECISIONS ===\n")
 		for _, d := range decisions {
-			sb.WriteString(fmt.Sprintf("- %s\n", d.Content))
+			fmt.Fprintf(&sb, "- %s\n", d.Content)
 		}
 	}
 
@@ -237,7 +237,7 @@ func (e *EvoGraph) queryPriorChains(ctx context.Context) string {
 		return ""
 	}
 	session := e.neo4j.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	defer session.Close(ctx)
+	defer func() { _ = session.Close(ctx) }()
 
 	result, err := session.Run(ctx, `
 		MATCH (f:ChainFinding)
@@ -293,7 +293,7 @@ func (e *EvoGraph) writeAndAppend(ctx context.Context, label, sessionID string, 
 		return
 	}
 	session := e.neo4j.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(ctx)
+	defer func() { _ = session.Close(ctx) }()
 
 	query := fmt.Sprintf("CREATE (n:%s $props) WITH n MATCH (c:AttackChain {session_id: $session_id}) CREATE (c)-[:HAS_NODE]->(n)", label)
 	_, err := session.Run(ctx, query, map[string]interface{}{
