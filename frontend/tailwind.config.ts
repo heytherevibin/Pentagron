@@ -149,6 +149,8 @@ const config: Config = {
         'orbit-reverse': 'orbit 60s linear infinite reverse',
         'scan':          'scan 8s linear infinite',
         'gradient':      'gradient 8s ease infinite',
+        'radar-ping':    'radar-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite',
+        'glow-pulse':    'glowPulse 2s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -178,6 +180,14 @@ const config: Config = {
         gradient: {
           '0%, 100%': { backgroundPosition: '0% 50%' },
           '50%':      { backgroundPosition: '100% 50%' },
+        },
+        'radar-ping': {
+          '0%':   { transform: 'scale(0.5)', opacity: '0.7' },
+          '100%': { transform: 'scale(2.0)', opacity: '0' },
+        },
+        glowPulse: {
+          '0%, 100%': { opacity: '0.4' },
+          '50%':      { opacity: '0.8' },
         },
       },
     },

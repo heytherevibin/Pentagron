@@ -22,7 +22,7 @@ WORKDIR /app
 
 # Install build dependencies and air
 RUN apk add --no-cache ca-certificates git
-RUN go install github.com/air-verse/air@v1.61.7
+RUN go install github.com/air-verse/air@v1.61.7 && cp $(go env GOPATH)/bin/air /usr/local/bin/
 
 COPY go.mod go.sum ./
 RUN go mod download
