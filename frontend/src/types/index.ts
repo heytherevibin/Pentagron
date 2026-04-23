@@ -135,3 +135,175 @@ export interface GraphEdge {
   target: string
   type: string
 }
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export type NotificationKind =
+  | 'approval_request'
+  | 'flow_completed'
+  | 'flow_failed'
+  | 'finding_critical'
+  | 'finding_high'
+  | 'system'
+  | 'mention'
+
+export interface NotificationItem {
+  id: string
+  kind: NotificationKind
+  title: string
+  body?: string
+  href?: string
+  flow_id?: string
+  project_id?: string
+  read_at?: string
+  created_at: string
+}
+
+// ── Insights / Metrics ────────────────────────────────────────────────────────
+
+export interface MetricSummary {
+  total_flows: number
+  running_flows: number
+  completed_flows: number
+  failed_flows: number
+  total_findings: number
+  critical_findings: number
+  high_findings: number
+  medium_findings: number
+  low_findings: number
+  mean_time_to_finding_seconds?: number
+  approvals_pending: number
+  approvals_resolved_24h: number
+}
+
+export interface TimeseriesPoint {
+  bucket: string // ISO timestamp
+  value: number
+  [k: string]: number | string
+}
+
+export interface SeverityTimeseries {
+  points: Array<{
+    bucket: string
+    critical: number
+    high: number
+    medium: number
+    low: number
+    info: number
+  }>
+}
+
+export interface PhaseDurationBucket {
+  phase: Phase
+  p50_seconds: number
+  p90_seconds: number
+  p99_seconds: number
+  mean_seconds: number
+  samples: number
+}
+
+export interface TopTarget {
+  target: string
+  flow_count: number
+  finding_count: number
+  last_seen: string
+}
+
+// ── Flow runs (history) ───────────────────────────────────────────────────────
+
+export interface FlowRun {
+  id: string
+  flow_id: string
+  status: FlowStatus
+  phase: Phase
+  started_at: string
+  completed_at?: string
+  duration_ms?: number
+  findings_count: number
+  critical_count: number
+  trigger: 'manual' | 'schedule' | 'api' | 'retry'
+  triggered_by?: string
+}
+
+// ── Audit / Security ──────────────────────────────────────────────────────────
+
+export interface AuditEvent {
+  id: string
+  actor_id: string
+  actor_email: string
+  action: string
+  target_type: string
+  target_id?: string
+  ip?: string
+  user_agent?: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface ApiKey {
+  id: string
+  name: string
+  prefix: string
+  scopes: string[]
+  created_at: string
+  last_used_at?: string
+  expires_at?: string
+  revoked_at?: string
+}
+
+export interface Session {
+  id: string
+  user_id: string
+  ip: string
+  user_agent: string
+  city?: string
+  country?: string
+  current: boolean
+  created_at: string
+  last_active_at: string
+  expires_at: string
+}
+
+export interface Integration {
+  id: string
+  kind: 'slack' | 'jira' | 'webhook' | 'email' | 'pagerduty'
+  name: string
+  enabled: boolean
+  config: Record<string, unknown>
+  created_at: string
+  last_delivery_at?: string
+  last_error?: string
+}
+
+export interface RbacRole {
+  id: string
+  name: 'admin' | 'operator' | 'viewer' | string
+  description?: string
+  permissions: string[]
+  system: boolean
+}
+
+export interface RbacPermission {
+  key: string
+  group: string
+  description: string
+}
+
+// ── 2FA / SSO ─────────────────────────────────────────────────────────────────
+
+export interface TwoFactorStatus {
+  enabled: boolean
+  method?: 'totp' | 'webauthn'
+  enrolled_at?: string
+  last_used_at?: string
+}
+
+export interface SsoProvider {
+  id: string
+  kind: 'saml' | 'oidc'
+  name: string
+  enabled: boolean
+  issuer?: string
+  acs_url?: string
+  created_at: string
+}

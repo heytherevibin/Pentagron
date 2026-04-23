@@ -74,6 +74,39 @@ export const CardContent = React.forwardRef<
 ))
 CardContent.displayName = 'CardContent'
 
+/**
+ * SurfaceCard — a Card with the top-edge hairline highlight and elevation-1
+ * shadow. Use for "premium" contexts: hero stats, command-palette entries,
+ * approval sheet anchors. For normal content cards, keep plain <Card>.
+ *
+ * Composition: renders a <Card> and applies `.surface-hairline` + `shadow-elev-1`.
+ * All Card props (interactive, featured, className, …) are forwarded as-is.
+ */
+export const SurfaceCard = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<typeof Card> & {
+    /** Bump to elevation-2 for dropdown-like contexts. */
+    elevation?: 1 | 2 | 3
+    /** Swap the accent glow on (reserved for hero / "live" moments). */
+    glow?: 'accent' | 'critical'
+  }
+>(({ className, elevation = 1, glow, ...props }, ref) => (
+  <Card
+    ref={ref}
+    className={cn(
+      'surface-hairline',
+      elevation === 1 && 'shadow-elev-1',
+      elevation === 2 && 'shadow-elev-2',
+      elevation === 3 && 'shadow-elev-3',
+      glow === 'accent' && 'shadow-glow-accent',
+      glow === 'critical' && 'shadow-glow-critical',
+      className,
+    )}
+    {...props}
+  />
+))
+SurfaceCard.displayName = 'SurfaceCard'
+
 export const CardFooter = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>

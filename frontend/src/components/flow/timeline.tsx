@@ -20,8 +20,30 @@ import type { WSMessage } from '@/types'
  * ReAct Timeline — renders the stream of agent_thought / tool_call /
  * tool_result / phase_change / approval_request / final_answer / error
  * messages as a vertical rail with iconography and tight typography.
+ *
+ * When `active` is true and the last message is not a terminal event
+ * (final_answer / error), the last item's ring pulses subtly — the
+ * operator's "the agent is thinking right now" cue.
  */
-export function ReactTimeline({ messages }: { messages: WSMessage[] }) {
+export function ReactTimeline({
+  messages,
+  active = false,
+}: {
+  messages: WSMessage[]
+  active?: boolean
+}) {
+  // Only pulse the tail when the flow is active AND the last event isn't a
+  // terminal one. Terminal events already have their own semantic colour
+  // (critical for error, accent for final_answer), adding pulse on top
+  // would mis-train operators into thinking the flow is still running.
+  const last = messages[messages.length - 1]
+  const lastIsTerminal =
+    last?.type === 'final_answer' || last?.type === 'error'
+  const pulseLastIndex =
+    active && !lastIsTerminal && messages.length > 0
+      ? messages.length - 1
+      : -1
+
   if (messages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center gap-3 py-12 px-6">
@@ -39,16 +61,30 @@ export function ReactTimeline({ messages }: { messages: WSMessage[] }) {
     <ol className="relative flex flex-col">
       <div aria-hidden className="absolute left-[15px] top-2 bottom-2 w-px bg-border" />
       {messages.map((m, i) => (
-        <TimelineItem key={`${m.type}-${m.timestamp}-${i}`} msg={m} index={i} />
+        <TimelineItem
+          key={`${m.type}-${m.timestamp}-${i}`}
+          msg={m}
+          index={i}
+          live={i === pulseLastIndex}
+        />
       ))}
     </ol>
   )
 }
 
-function TimelineItem({ msg, index }: { msg: WSMessage; index: number }) {
+function TimelineItem({
+  msg,
+  index,
+  live,
+}: {
+  msg: WSMessage
+  index: number
+  live: boolean
+}) {
   const meta = describe(msg)
   return (
     <motion.li
+      layout="position"
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.02, 0.2), duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
@@ -59,6 +95,10 @@ function TimelineItem({ msg, index }: { msg: WSMessage; index: number }) {
           'relative z-10 inline-flex h-7 w-7 items-center justify-center rounded-full shrink-0',
           'border bg-bg ring-inset-hi',
           meta.ring,
+          // Pulse ring on the active (last, non-terminal) step when the
+          // flow is running. Uses the accent or critical pulse depending
+          // on whether the step itself is critical-toned.
+          live && (meta.critical ? 'pulse-critical' : 'pulse-accent'),
         )}
       >
         <meta.icon className={cn('h-3.5 w-3.5', meta.iconClass)} />
@@ -93,6 +133,9 @@ type Describe = {
   ring: string
   body?: React.ReactNode
   detail?: string
+  /** When true and this is the live/active step, pulse uses the critical
+   *  palette instead of accent — matches the step's semantic colour. */
+  critical?: boolean
 }
 
 function describe(m: WSMessage): Describe {
@@ -128,6 +171,7 @@ function describe(m: WSMessage): Describe {
         iconClass: m.success === false ? 'text-sev-critical' : 'text-accent',
         ring: m.success === false ? 'border-sev-critical/40' : 'border-accent/40',
         body: truncate(m.content ?? stringifyPayload(m.payload), 400),
+        critical: m.success === false,
       }
     case 'phase_change':
       return {
@@ -168,6 +212,7 @@ function describe(m: WSMessage): Describe {
         iconClass: 'text-sev-critical',
         ring: 'border-sev-critical/40',
         body: m.content ?? stringifyPayload(m.payload),
+        critical: true,
       }
     default:
       return {

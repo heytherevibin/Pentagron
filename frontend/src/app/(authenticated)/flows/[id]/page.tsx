@@ -13,6 +13,7 @@ import {
   Trash2,
   Clock,
   Target,
+  ArrowUpRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -29,11 +30,13 @@ import { PhaseProgress } from '@/components/flow/phase-progress'
 import { ReactTimeline } from '@/components/flow/timeline'
 import { AgentChat } from '@/components/flow/agent-chat'
 import { ApprovalsPanel } from '@/components/flow/approvals'
+import { GraphView } from '@/components/graph/graph-view'
+import { RunsHistory } from '@/components/flow/runs-history'
 import { useAgentWebSocket } from '@/hooks/useAgentWebSocket'
 import { flows } from '@/lib/api'
 import { STATUS_CLASSES, STATUS_LABEL, PHASE_LABEL } from '@/lib/constants'
 import { cn, formatDateTime, timeAgo } from '@/lib/utils'
-import type { ApprovalRequest, Flow, WSMessage } from '@/types'
+import type { ApprovalRequest, Flow, GraphEdge, GraphNode, WSMessage } from '@/types'
 
 /**
  * Flow detail — the command center for a single pipeline.
@@ -61,6 +64,15 @@ export default function FlowDetailPage() {
     () => flows.listApprovals(flowId).then((r) => r.data as { approvals?: ApprovalRequest[] }),
     { refreshInterval: 15_000 },
   )
+  const { data: graphData, mutate: mutateGraph } = useSWR(
+    flowId ? `/api/flows/${flowId}/graph` : null,
+    async () => {
+      const r = await flows.graph(flowId)
+      const d = r.data as { nodes?: GraphNode[]; edges?: GraphEdge[]; links?: GraphEdge[] }
+      return { nodes: d.nodes ?? [], edges: d.edges ?? d.links ?? [] }
+    },
+    { refreshInterval: 15_000 },
+  )
 
   const flow = flowData?.flow
   const sessionId = flowData?.session_id ?? flowId
@@ -77,9 +89,10 @@ export default function FlowDetailPage() {
         if (m.type === 'phase_change' || m.type === 'approval_request') {
           void mutateFlow()
           void mutateApprovals()
+          void mutateGraph()
         }
       },
-      [mutateFlow, mutateApprovals],
+      [mutateFlow, mutateApprovals, mutateGraph],
     ),
   })
 
@@ -121,6 +134,7 @@ export default function FlowDetailPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="graph">Attack graph</TabsTrigger>
+          <TabsTrigger value="runs">Run history</TabsTrigger>
           <TabsTrigger value="report">Report</TabsTrigger>
         </TabsList>
 
@@ -135,7 +149,7 @@ export default function FlowDetailPage() {
             </CardHeader>
             <CardContent className="pt-0">
               <ScrollArea className="h-[560px] pr-2">
-                <ReactTimeline messages={messages} />
+                <ReactTimeline messages={messages} active={flow.status === 'running'} />
               </ScrollArea>
             </CardContent>
           </Card>
@@ -148,7 +162,7 @@ export default function FlowDetailPage() {
               <CardHeader><CardTitle className="text-sm">Live stream</CardTitle></CardHeader>
               <CardContent className="pt-0">
                 <ScrollArea className="h-[460px] pr-2">
-                  <ReactTimeline messages={messages} />
+                  <ReactTimeline messages={messages} active={flow.status === 'running'} />
                 </ScrollArea>
               </CardContent>
             </Card>
@@ -184,31 +198,33 @@ export default function FlowDetailPage() {
           </Card>
         </TabsContent>
 
-        {/* Graph — stub, real implementation in the EvoGraph milestone */}
+        {/* Graph — live EvoGraph view, scoped to this flow */}
         <TabsContent value="graph" className="mt-4">
           <Card>
-            <CardContent className="py-12">
-              <div className="flex flex-col items-center gap-3 text-center">
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-bg-subtle">
-                  <Target className="h-4 w-4 text-accent" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-fg">Attack-chain graph</div>
-                  <div className="mt-1 text-xs text-fg-muted max-w-md">
-                    A force-directed visualisation of the EvoGraph attack chain ships
-                    in the next milestone. For now you can pull the raw graph via
-                    the API.
-                  </div>
-                </div>
-                <Link
-                  href="/evograph"
-                  className="text-xs text-accent hover:underline underline-offset-4"
-                >
-                  Preview EvoGraph →
-                </Link>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm">Attack-chain graph</CardTitle>
+              <Link
+                href={`/evograph?flow=${flowId}`}
+                className="inline-flex items-center gap-1 meta-mono hover:text-fg transition-colors duration-120"
+              >
+                Open fullscreen
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <GraphView
+                nodes={graphData?.nodes ?? []}
+                edges={graphData?.edges ?? []}
+                height={520}
+                emptyLabel="No graph nodes yet"
+              />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Run history */}
+        <TabsContent value="runs" className="mt-4">
+          <RunsHistory flowId={flowId} />
         </TabsContent>
 
         {/* Report */}

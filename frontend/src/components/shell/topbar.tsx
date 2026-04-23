@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils'
 import { UserMenu } from './user-menu'
 import { useCommandPalette } from './command-palette'
 import { NAV_ITEMS } from './nav-config'
+import { Notifications } from './notifications'
+import { ThemeToggle } from './theme-toggle'
 
 /**
  * Topbar — 56px high, sticky. Composition:
@@ -34,8 +36,10 @@ export function Topbar({
     <header
       className={cn(
         'sticky top-0 z-30 h-14 shrink-0',
-        'border-b border-border bg-bg/80 backdrop-blur-md',
+        'border-b border-border bg-bg/80 backdrop-blur-md supports-[backdrop-filter]:bg-bg/70',
         'flex items-center gap-3 px-4 lg:px-6',
+        // honour iOS notch when run as an installed PWA
+        'pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]',
       )}
     >
       {/* Mobile — hamburger + wordmark */}
@@ -43,18 +47,18 @@ export function Topbar({
         <button
           type="button"
           onClick={onOpenMobileNav}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-bg-subtle text-fg-muted hover:text-fg hover:border-border-strong transition-colors duration-120 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-bg-subtle text-fg-muted hover:text-fg hover:border-border-strong transition-colors duration-120 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55 active:scale-95"
           aria-label="Open navigation"
         >
-          <Menu className="h-3.5 w-3.5" />
+          <Menu className="h-4 w-4" />
         </button>
-        <Link href="/" aria-label="Pentagron">
+        <Link href="/" aria-label="Pentagron" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55 rounded">
           <Wordmark className="text-lg" />
         </Link>
       </div>
 
-      {/* Breadcrumbs */}
-      <nav aria-label="Breadcrumb" className="hidden lg:flex items-center gap-1.5 min-w-0">
+      {/* Breadcrumbs — surface from `md:` (tablet) with overflow-safe truncation. */}
+      <nav aria-label="Breadcrumb" className="hidden md:flex items-center gap-1.5 min-w-0 overflow-hidden">
         {crumbs.map((c, i) => {
           const last = i === crumbs.length - 1
           return (
@@ -77,26 +81,31 @@ export function Topbar({
 
       <div className="flex-1" />
 
-      {/* Command trigger */}
+      {/* Command trigger — compact icon on narrow, full pill on sm+ */}
       <button
         type="button"
         onClick={openPalette}
         className={cn(
-          'inline-flex items-center gap-2 h-8 rounded-md',
+          'inline-flex items-center gap-2 h-9 sm:h-8 rounded-md',
           'border border-border bg-bg-subtle/60 ring-inset-hi',
           'hover:bg-bg-muted hover:border-border-strong',
-          'transition-colors duration-120 px-2.5',
+          'transition-colors duration-120',
+          // Square on mobile (40×40 touch target), pill on sm+
+          'w-9 sm:w-auto justify-center sm:justify-start px-0 sm:px-2.5',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55',
         )}
         aria-label="Open command palette"
       >
-        <Search className="h-3.5 w-3.5 text-fg-subtle" />
+        <Search className="h-4 w-4 sm:h-3.5 sm:w-3.5 text-fg-subtle" />
         <span className="hidden sm:inline text-xs text-fg-subtle">Search</span>
-        <span className="hidden sm:flex items-center gap-0.5 ml-6">
+        <span className="hidden md:flex items-center gap-0.5 ml-6">
           <Kbd>⌘</Kbd>
           <Kbd>K</Kbd>
         </span>
       </button>
+
+      <Notifications />
+      <ThemeToggle />
 
       <Separator orientation="vertical" className="h-5 hidden sm:block" />
 

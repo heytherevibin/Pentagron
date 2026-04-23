@@ -73,8 +73,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'PENTAGRON', {
       body: data.body || 'New notification',
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-192x192.png',
+      icon: '/icons/icon-192x192.svg',
+      badge: '/icons/icon-192x192.svg',
       tag: data.tag || 'pentagron-notification',
       data: { url: data.url || '/' },
     })

@@ -70,7 +70,13 @@ export function Shell({
         <Sidebar collapsed={collapsed} onToggleCollapsed={toggleCollapsed} />
         <div className="flex flex-1 flex-col min-w-0">
           <Topbar email={email} onOpenMobileNav={() => setMobileOpen(true)} />
-          <main className="flex-1 min-w-0">{children}</main>
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="flex-1 min-w-0 focus:outline-none"
+          >
+            {children}
+          </main>
         </div>
         <MobileNav open={mobileOpen} onOpenChange={setMobileOpen} />
       </div>

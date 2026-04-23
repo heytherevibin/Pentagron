@@ -97,6 +97,102 @@ export const health = {
   all: () => api.get('/api/health/all'),
 }
 
+// ── Notifications ─────────────────────────────────────────────────────────────
+// Backend endpoints are scheduled for delivery — each helper degrades to an
+// empty payload if the route 404s so the bell / dropdown render a graceful
+// empty state rather than throwing.
+export const notifications = {
+  list: (params?: { unread?: boolean; limit?: number }) =>
+    api.get('/api/notifications', { params }),
+  unreadCount: () => api.get('/api/notifications/unread-count'),
+  markRead: (id: string) => api.post(`/api/notifications/${id}/read`),
+  markAllRead: () => api.post('/api/notifications/read-all'),
+  clear: () => api.delete('/api/notifications'),
+}
+
+// ── Insights / Metrics ────────────────────────────────────────────────────────
+export const insights = {
+  summary: (window: '24h' | '7d' | '30d' = '7d') =>
+    api.get('/api/insights/summary', { params: { window } }),
+  findingsOverTime: (window: '24h' | '7d' | '30d' = '7d') =>
+    api.get('/api/insights/findings', { params: { window } }),
+  phaseDurations: (window: '24h' | '7d' | '30d' = '7d') =>
+    api.get('/api/insights/phase-durations', { params: { window } }),
+  topTargets: (limit = 10) => api.get('/api/insights/top-targets', { params: { limit } }),
+  approvalLatency: (window: '24h' | '7d' | '30d' = '7d') =>
+    api.get('/api/insights/approval-latency', { params: { window } }),
+}
+
+// ── Flow runs (history tab) ──────────────────────────────────────────────────
+export const runs = {
+  list: (flowId: string) => api.get(`/api/flows/${flowId}/runs`),
+  get: (flowId: string, runId: string) => api.get(`/api/flows/${flowId}/runs/${runId}`),
+  retry: (flowId: string, runId: string) =>
+    api.post(`/api/flows/${flowId}/runs/${runId}/retry`),
+}
+
+// ── Enterprise: audit / keys / sessions / integrations / RBAC ────────────────
+export const audit = {
+  list: (params?: { actor?: string; action?: string; from?: string; to?: string; limit?: number }) =>
+    api.get('/api/audit', { params }),
+  export: (format: 'csv' | 'json' = 'csv') =>
+    api.get('/api/audit/export', { params: { format }, responseType: 'blob' }),
+}
+
+export const apiKeys = {
+  list: () => api.get('/api/api-keys'),
+  create: (data: { name: string; scopes: string[]; expires_in_days?: number }) =>
+    api.post('/api/api-keys', data),
+  revoke: (id: string) => api.delete(`/api/api-keys/${id}`),
+}
+
+export const sessions = {
+  list: () => api.get('/api/sessions'),
+  revoke: (id: string) => api.delete(`/api/sessions/${id}`),
+  revokeOthers: () => api.post('/api/sessions/revoke-others'),
+}
+
+export const integrations = {
+  list: () => api.get('/api/integrations'),
+  create: (data: { kind: string; name: string; config: Record<string, unknown> }) =>
+    api.post('/api/integrations', data),
+  update: (id: string, data: Partial<{ name: string; enabled: boolean; config: Record<string, unknown> }>) =>
+    api.put(`/api/integrations/${id}`, data),
+  test: (id: string) => api.post(`/api/integrations/${id}/test`),
+  delete: (id: string) => api.delete(`/api/integrations/${id}`),
+}
+
+export const rbac = {
+  roles: () => api.get('/api/rbac/roles'),
+  permissions: () => api.get('/api/rbac/permissions'),
+  createRole: (data: { name: string; description?: string; permissions: string[] }) =>
+    api.post('/api/rbac/roles', data),
+  updateRole: (id: string, data: Partial<{ name: string; description: string; permissions: string[] }>) =>
+    api.put(`/api/rbac/roles/${id}`, data),
+  deleteRole: (id: string) => api.delete(`/api/rbac/roles/${id}`),
+  assign: (userId: string, roleId: string) =>
+    api.post(`/api/users/${userId}/role`, { role_id: roleId }),
+}
+
+export const twoFactor = {
+  status: () => api.get('/api/2fa/status'),
+  enrollBegin: () => api.post('/api/2fa/enroll'),
+  enrollVerify: (code: string) => api.post('/api/2fa/verify', { code }),
+  disable: (code: string) => api.post('/api/2fa/disable', { code }),
+  recoveryCodes: () => api.get('/api/2fa/recovery-codes'),
+  regenerateRecovery: () => api.post('/api/2fa/recovery-codes/regenerate'),
+}
+
+export const sso = {
+  providers: () => api.get('/api/sso/providers'),
+  create: (data: { kind: 'saml' | 'oidc'; name: string; config: Record<string, unknown> }) =>
+    api.post('/api/sso/providers', data),
+  update: (id: string, data: Partial<{ name: string; enabled: boolean; config: Record<string, unknown> }>) =>
+    api.put(`/api/sso/providers/${id}`, data),
+  delete: (id: string) => api.delete(`/api/sso/providers/${id}`),
+  metadata: (id: string) => api.get(`/api/sso/providers/${id}/metadata`),
+}
+
 // ── WebSocket URL builder ─────────────────────────────────────────────────────
 //
 // Browser WebSocket APIs do not support custom request headers, so the JWT must

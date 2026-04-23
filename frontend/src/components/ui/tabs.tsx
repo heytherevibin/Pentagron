@@ -13,7 +13,11 @@ export const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      'relative inline-flex h-9 items-center gap-1 border-b border-border',
+      // Horizontal scroll on narrow viewports so long tab lists never clip
+      // or wrap awkwardly. `scrollbar-none` is CSS-hidden, swipe still works.
+      'relative flex h-9 items-center gap-1 border-b border-border',
+      'max-w-full overflow-x-auto overflow-y-hidden',
+      '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
       className,
     )}
     {...props}
@@ -28,8 +32,8 @@ export const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      'relative inline-flex items-center gap-1.5 h-9 px-3',
-      'text-sm font-medium text-fg-muted',
+      'relative inline-flex items-center gap-1.5 h-9 px-3 shrink-0',
+      'text-sm font-medium text-fg-muted whitespace-nowrap',
       'transition-colors duration-120',
       'hover:text-fg',
       'data-[state=active]:text-fg',

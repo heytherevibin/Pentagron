@@ -120,6 +120,12 @@ const config: Config = {
         'card':      '0 0 0 1px hsl(var(--border) / 1), 0 1px 2px hsl(0 0% 0% / 0.4)',
         'pop':       '0 8px 24px -6px hsl(0 0% 0% / 0.6), 0 0 0 1px hsl(var(--border-strong) / 1)',
         'inner-hi':  'inset 0 1px 0 0 hsl(0 0% 100% / 0.04)',
+        // Canonical elevation tiers — 1:cards, 2:menus, 3:dialogs/sheets
+        'elev-1':    'inset 0 1px 0 0 hsl(0 0% 100% / 0.03), 0 1px 2px 0 hsl(0 0% 0% / 0.55)',
+        'elev-2':    'inset 0 1px 0 0 hsl(0 0% 100% / 0.04), 0 4px 12px -2px hsl(0 0% 0% / 0.5)',
+        'elev-3':    'inset 0 1px 0 0 hsl(0 0% 100% / 0.05), 0 12px 32px -8px hsl(0 0% 0% / 0.6)',
+        'glow-accent':   '0 0 0 1px hsl(var(--accent) / 0.4), 0 0 24px -4px hsl(var(--accent) / 0.35)',
+        'glow-critical': '0 0 0 1px hsl(var(--sev-critical) / 0.45), 0 0 24px -4px hsl(var(--sev-critical) / 0.4)',
       },
       backgroundImage: {
         'grid-fade': 'radial-gradient(ellipse 80% 60% at 50% 0%, hsl(var(--accent) / 0.08), transparent 60%)',

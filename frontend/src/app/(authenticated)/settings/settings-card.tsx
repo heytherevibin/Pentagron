@@ -28,14 +28,14 @@ export function SettingsCard({
 }) {
   return (
     <Card className={cn('overflow-hidden', className)}>
-      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-0">
+      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] gap-0">
         <CardHeader className="md:border-r md:border-b-0 border-b border-border-subtle bg-bg-subtle/30">
           <CardTitle className="text-sm">{title}</CardTitle>
           {description && (
             <p className="mt-1.5 text-xs leading-relaxed text-fg-muted">{description}</p>
           )}
         </CardHeader>
-        <CardContent className="py-5">{children}</CardContent>
+        <CardContent className="py-5 min-w-0">{children}</CardContent>
       </div>
       {footer && (
         <div className="border-t border-border-subtle bg-bg-subtle/40 px-6 py-3">

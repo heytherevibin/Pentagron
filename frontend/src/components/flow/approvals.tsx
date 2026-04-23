@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { HoldButton } from '@/components/ui/hold-button'
 import { Textarea } from '@/components/ui/input'
 import { flows } from '@/lib/api'
 import { PHASE_LABEL } from '@/lib/constants'
@@ -120,6 +121,13 @@ function ApprovalCard({
     }
   }
 
+  // Exploitation + post-exploitation gates warrant hold-to-confirm. Recon /
+  // vuln-scan approvals use a plain click — keep friction proportional to
+  // blast radius.
+  const destructive =
+    approval.status === 'pending' &&
+    (approval.phase === 'exploitation' || approval.phase === 'post_exploitation')
+
   return (
     <motion.li
       initial={{ opacity: 0, y: 6 }}
@@ -128,21 +136,40 @@ function ApprovalCard({
     >
       <Card
         className={cn(
-          approval.status === 'pending' && 'border-sev-high/30 bg-sev-high/[0.03]',
+          // Premium surface for pending destructive gates — hairline top edge,
+          // subtle severity glow. This is the "hero moment" of the app.
+          destructive && 'surface-hairline shadow-glow-critical',
+          approval.status === 'pending' && !destructive &&
+            'border-sev-high/30 bg-sev-high/[0.03]',
+          destructive && 'border-sev-critical/40 bg-sev-critical/[0.04]',
           approval.status === 'approved' && 'border-accent/30 bg-accent/[0.03]',
           approval.status === 'rejected' && 'border-sev-critical/30 bg-sev-critical/[0.03]',
         )}
       >
         <CardContent className="py-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle
-              className={cn(
-                'h-4 w-4 mt-0.5 shrink-0',
-                approval.status === 'pending' && 'text-sev-high',
-                approval.status === 'approved' && 'text-accent',
-                approval.status === 'rejected' && 'text-sev-critical',
-              )}
-            />
+            <motion.span
+              // One-shot pop-in for the warning icon on a new pending gate.
+              // No infinite loop — this fires once on mount, then settles.
+              initial={
+                approval.status === 'pending'
+                  ? { scale: 0.6, opacity: 0 }
+                  : false
+              }
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.45, times: [0, 1], ease: [0.34, 1.56, 0.64, 1] }}
+              className="shrink-0"
+            >
+              <AlertTriangle
+                className={cn(
+                  'h-4 w-4 mt-0.5',
+                  destructive && 'text-sev-critical',
+                  approval.status === 'pending' && !destructive && 'text-sev-high',
+                  approval.status === 'approved' && 'text-accent',
+                  approval.status === 'rejected' && 'text-sev-critical',
+                )}
+              />
+            </motion.span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-medium text-fg">
@@ -207,17 +234,33 @@ function ApprovalCard({
                     >
                       Reject
                     </Button>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      size="sm"
-                      onClick={() => run('approve')}
-                      loading={busy === 'approve'}
-                      disabled={busy !== null}
-                      leftIcon={<Check />}
-                    >
-                      Approve &amp; continue
-                    </Button>
+                    {destructive ? (
+                      <HoldButton
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        holdMs={800}
+                        onConfirm={() => void run('approve')}
+                        loading={busy === 'approve'}
+                        disabled={busy !== null}
+                        leftIcon={<Check />}
+                        title="Hold to approve — destructive phase"
+                      >
+                        Hold to approve
+                      </HoldButton>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={() => run('approve')}
+                        loading={busy === 'approve'}
+                        disabled={busy !== null}
+                        leftIcon={<Check />}
+                      >
+                        Approve &amp; continue
+                      </Button>
+                    )}
                   </div>
                 </>
               )}

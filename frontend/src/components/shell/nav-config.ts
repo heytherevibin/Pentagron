@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   Settings,
   Activity,
+  LineChart,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -60,6 +61,13 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Network,
         match: (p) => p.startsWith('/evograph'),
         shortcut: 'G E',
+      },
+      {
+        href: '/insights',
+        label: 'Insights',
+        icon: LineChart,
+        match: (p) => p.startsWith('/insights'),
+        shortcut: 'G I',
       },
       {
         href: '/activity',

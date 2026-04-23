@@ -52,7 +52,81 @@
     /* Focus ring */
     --ring: 152 100% 43%;
 
+    /* ── Motion rhythm ────────────────────────────────────────────────────
+       One global easing/duration vocabulary. Framer Motion variants in
+       src/lib/motion.ts reference these values in seconds; CSS uses the
+       Tailwind duration-120/180/240 tokens (see tailwind.config.ts).
+       ──────────────────────────────────────────────────────────────────── */
+    --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-expo:   cubic-bezier(0.7, 0, 0.84, 0);
+    --ease-spring:    cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* ── Elevation tier ──────────────────────────────────────────────────
+       Three tiers mapped to Card (shadow-elev-1), Menu/Dropdown (-2),
+       Dialog/Sheet/Palette (-3). Keeps depth consistent across surfaces. */
+    --shadow-elev-1: 0 1px 0 0 hsl(0 0% 100% / 0.03) inset,
+                     0 1px 2px 0 hsl(0 0% 0% / 0.55);
+    --shadow-elev-2: 0 1px 0 0 hsl(0 0% 100% / 0.04) inset,
+                     0 4px 12px -2px hsl(0 0% 0% / 0.5);
+    --shadow-elev-3: 0 1px 0 0 hsl(0 0% 100% / 0.05) inset,
+                     0 12px 32px -8px hsl(0 0% 0% / 0.6);
+    /* Severity-aware glows — reserved for hero/critical moments. */
+    --shadow-glow-accent:   0 0 0 1px hsl(var(--accent) / 0.4),
+                            0 0 24px -4px hsl(var(--accent) / 0.35);
+    --shadow-glow-critical: 0 0 0 1px hsl(var(--sev-critical) / 0.45),
+                            0 0 24px -4px hsl(var(--sev-critical) / 0.4);
+
     color-scheme: dark;
+  }
+
+  /* ──────────────────────────────────────────────────────────────────────
+     Light palette — activates when `<html data-theme="light">` is set by
+     next-themes. Mirrors the semantic names above so every component
+     "just works" without conditional className logic.
+     Note: true-white canvas is avoided to reduce glare on OLED; we use a
+     subtle off-white inspired by Linear/Vercel dashboards.
+     ────────────────────────────────────────────────────────────────────── */
+  html[data-theme='light'] {
+    /* Canvas + surfaces */
+    --bg:           0 0% 100%;       /* #FFFFFF */
+    --bg-subtle:    210 20% 98%;     /* #F7F8FA */
+    --bg-muted:     210 16% 96%;     /* #F1F3F5 */
+    --bg-elevated:  0 0% 100%;       /* #FFFFFF (popovers — with shadow) */
+    --bg-inverse:   240 5% 9%;       /* #18181B */
+
+    /* Hairlines */
+    --border:        220 14% 89%;    /* #DFE3E8 */
+    --border-subtle: 220 14% 93%;    /* #E9ECEF */
+    --border-strong: 220 13% 78%;    /* #C4CAD1 */
+
+    /* Foreground */
+    --fg:          240 10% 10%;      /* #18181B */
+    --fg-muted:    240 5% 34%;       /* #52525B */
+    --fg-subtle:   240 4% 46%;       /* #71717A */
+    --fg-disabled: 240 4% 70%;       /* #ACACB3 */
+    --fg-inverse:  0 0% 98%;
+
+    /* Brand accent — same Vercel green, slightly darker shade for light-mode AA */
+    --accent:        152 93% 32%;    /* #069E5E — darker for contrast */
+    --accent-hover:  152 93% 28%;
+    --accent-subtle: 152 93% 32%;
+    --accent-fg:     0 0% 100%;      /* white ink on darker green */
+
+    /* Severity — richer, saturated hues */
+    --sev-critical: 0 74% 50%;       /* #DC2626 */
+    --sev-high:     25 90% 50%;      /* #F97316 */
+    --sev-medium:   38 92% 50%;      /* #F59E0B */
+    --sev-low:      213 87% 52%;     /* #2563EB */
+    --sev-info:     240 5% 34%;
+
+    --success: 152 93% 32%;
+    --warning: 38 92% 50%;
+    --danger:  0 74% 50%;
+    --info:    213 87% 52%;
+
+    --ring: 152 93% 32%;
+
+    color-scheme: light;
   }
 }
 
@@ -77,6 +151,24 @@
   body {
     @apply bg-bg text-fg font-sans antialiased min-h-screen;
     overflow-x: hidden;
+    /* Honour iOS safe-area insets when installed as PWA */
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+
+  /* Accessibility: respect user's motion preference.
+     Disables framer-motion & CSS transitions while keeping state changes. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* Vercel-style focus ring — subtle, accent-tinted, never harsh */
@@ -98,6 +190,18 @@
     margin: 0;
   }
   input[type='number'] { -moz-appearance: textfield; }
+
+  /* iOS Safari auto-zooms into any focused input whose computed font-size is
+     below 16px. Our UI intentionally uses 12/13px for inputs — we counter the
+     zoom by forcing a 16px base *only* on coarse-pointer devices, which is
+     where the behaviour actually fires. Desktop typography stays untouched. */
+  @media (pointer: coarse) {
+    input:not([type='checkbox']):not([type='radio']),
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
 
   /* Autofill — keep it dark */
   input:-webkit-autofill,
@@ -213,5 +317,91 @@
     );
     background-size: 200% 100%;
     @apply animate-shimmer;
+  }
+
+  /* Canonical monospace metadata tag — used across cards, lists, tooltips. */
+  .meta-mono {
+    @apply text-2xs font-mono uppercase tracking-widest text-fg-subtle;
+  }
+
+  /* Touch-target minimum (44×44 per WCAG 2.5.8) — applies only at coarse pointer. */
+  @media (pointer: coarse) {
+    .touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Safe-area horizontal padding for the page shell — blends with manual px. */
+  .px-shell {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+  @media (min-width: 640px) {
+    .px-shell {
+      padding-left: max(1.5rem, env(safe-area-inset-left));
+      padding-right: max(1.5rem, env(safe-area-inset-right));
+    }
+  }
+  @media (min-width: 1024px) {
+    .px-shell {
+      padding-left: max(2.5rem, env(safe-area-inset-left));
+      padding-right: max(2.5rem, env(safe-area-inset-right));
+    }
+  }
+
+  /* Accessibility: visible focus ring only when the user tabs to it. */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55 focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+  }
+
+  /* ── Tabular numerals — stops numeric columns from "twitching" on refresh */
+  .tabular      { font-variant-numeric: tabular-nums; }
+  .tabular-slash{ font-variant-numeric: tabular-nums slashed-zero; }
+
+  /* ── Elevation + glow utilities live in tailwind.config.ts (boxShadow)
+         so they compose with Tailwind state variants (hover:/focus:).
+         CSS vars `--shadow-elev-*` / `--shadow-glow-*` stay available for
+         direct `box-shadow: var(…)` use in inline/arbitrary values. */
+
+  /* ── Top-edge hairline — the Linear/Arc "premium" detail on elevated
+         surfaces. Add via `.surface-hairline` on any relatively-positioned
+         container; the ::before renders a 1px gradient along the top edge. */
+  .surface-hairline { position: relative; }
+  .surface-hairline::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(0 0% 100% / 0.08) 50%,
+      transparent 100%
+    );
+    pointer-events: none;
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+  }
+
+  /* ── Live status indicator — the "something is happening" pulse.
+         Use sparingly: running agents, active approvals queue, etc.      */
+  @keyframes pulse-ring-accent {
+    0%   { box-shadow: 0 0 0 0   hsl(var(--accent) / 0.55); }
+    70%  { box-shadow: 0 0 0 8px hsl(var(--accent) / 0);    }
+    100% { box-shadow: 0 0 0 0   hsl(var(--accent) / 0);    }
+  }
+  @keyframes pulse-ring-critical {
+    0%   { box-shadow: 0 0 0 0   hsl(var(--sev-critical) / 0.55); }
+    70%  { box-shadow: 0 0 0 8px hsl(var(--sev-critical) / 0);    }
+    100% { box-shadow: 0 0 0 0   hsl(var(--sev-critical) / 0);    }
+  }
+  .pulse-accent   { animation: pulse-ring-accent   1.8s ease-out infinite; }
+  .pulse-critical { animation: pulse-ring-critical 1.4s ease-out infinite; }
+
+  /* Terminal-style text glow — for the "what the agent is saying" ticker.
+     Apply on a single line; never on blocks (destroys legibility). */
+  .text-glow-accent {
+    text-shadow: 0 0 12px hsl(var(--accent) / 0.45);
   }
 }

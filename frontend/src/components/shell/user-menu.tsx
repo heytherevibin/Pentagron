@@ -48,12 +48,13 @@ export function UserMenu({ email }: { email?: string }) {
           type="button"
           aria-label="Open user menu"
           className={cn(
-            'inline-flex items-center gap-2 rounded-md px-1.5 py-1',
+            'inline-flex items-center gap-2 rounded-md px-1.5 py-1 min-h-[36px]',
             'hover:bg-bg-subtle transition-colors duration-120',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55',
+            'active:scale-[0.98]',
           )}
         >
-          <Avatar className="h-6 w-6">
+          <Avatar className="h-7 w-7 ring-1 ring-border-subtle">
             <AvatarFallback className="text-[10px] font-mono">{initials}</AvatarFallback>
           </Avatar>
           <span className="hidden sm:inline text-xs text-fg-muted max-w-[160px] truncate">

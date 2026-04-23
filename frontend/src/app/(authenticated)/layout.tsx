@@ -1,6 +1,8 @@
 'use client'
 
 import * as React from 'react'
+import { usePathname } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 
 import { Shell } from '@/components/shell/shell'
 
@@ -15,7 +17,31 @@ import { Shell } from '@/components/shell/shell'
  */
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const email = useOperatorEmail()
-  return <Shell email={email}>{children}</Shell>
+  // Suspense wrapper absorbs `useSearchParams()` CSR-bailouts from any page
+  // that uses the URL-state hook (URL-synced filters on lists, windows on
+  // insights, tabs on flow detail, etc). Without this every such page would
+  // need its own boundary; wrapping once here keeps pages terse.
+  const pathname = usePathname()
+  const reduce = useReducedMotion()
+  return (
+    <Shell email={email}>
+      <React.Suspense fallback={null}>
+        {/*
+          Subtle keyed fade+rise on route change. Keeps spatial continuity
+          without the cost/flicker of AnimatePresence wait-mode. Distance
+          collapses to 0 when the user prefers reduced motion.
+        */}
+        <motion.div
+          key={pathname}
+          initial={{ opacity: 0, y: reduce ? 0 : 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduce ? 0.12 : 0.18, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {children}
+        </motion.div>
+      </React.Suspense>
+    </Shell>
+  )
 }
 
 /**

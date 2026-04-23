@@ -12,6 +12,8 @@ import { Kbd } from '@/components/ui/kbd'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { widthTween } from '@/lib/motion'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 
 import { NAV_SECTIONS, type NavItem } from './nav-config'
 import { useCommandPalette } from './command-palette'
@@ -38,11 +40,12 @@ export function Sidebar({
 }) {
   const pathname = usePathname() ?? '/'
   const { toggle: onOpenCommandPalette } = useCommandPalette()
+  const reduced = usePrefersReducedMotion()
 
   return (
     <motion.aside
       animate={{ width: collapsed ? 56 : 248 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      transition={widthTween(reduced)}
       className={cn(
         'hidden lg:flex shrink-0 flex-col h-screen sticky top-0',
         'border-r border-border bg-bg',

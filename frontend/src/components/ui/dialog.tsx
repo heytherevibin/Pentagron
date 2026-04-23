@@ -39,7 +39,9 @@ export const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2',
-        'w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col',
+        // Guarantee a gutter on small viewports so dialogs never touch the edge;
+        // max-h accounts for iOS address-bar and safe-area insets via dvh.
+        'w-[calc(100%-2rem)] max-w-lg max-h-[min(85vh,85dvh)] overflow-hidden flex flex-col',
         'rounded-lg border border-border-strong bg-bg-subtle shadow-pop ring-inset-hi',
         'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
         'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',

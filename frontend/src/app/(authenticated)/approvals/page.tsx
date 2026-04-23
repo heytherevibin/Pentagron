@@ -3,17 +3,20 @@
 import * as React from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
-import { ArrowUpRight, ShieldCheck, ShieldAlert, Inbox } from 'lucide-react'
+import { ArrowUpRight, Check, Inbox, ShieldCheck, ShieldAlert, X } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { BulkActionsBar, DataTable, type Column, type SortState } from '@/components/ui/data-table'
 import { PageHeader, PageShell } from '@/components/shell/page-header'
 import { activity, flows as flowsApi } from '@/lib/api'
 import { PHASE_LABEL } from '@/lib/constants'
 import { cn, formatDateTime, timeAgo } from '@/lib/utils'
+import { useUrlStateMulti } from '@/hooks/useUrlState'
+import { useDensity } from '@/hooks/useDensity'
 import type { ApprovalRequest, FlowStatus, Phase } from '@/types'
 
 type FlowSummary = {
@@ -35,14 +38,15 @@ type ActivityEvent = {
 
 type Enriched = ApprovalRequest & { flow: FlowSummary }
 
+const DEFAULTS: Record<string, string> = { tab: 'pending', sort: '', dir: '' }
+
 /**
- * Approvals — cross-flow queue. The backend only exposes approvals per flow,
- * so we derive the set of flows from the activity feed and fan-out a fetch
- * per flow. In practice only a handful of flows are ever active, so this
- * stays lean.
+ * Approvals — cross-flow queue with URL-synced tabs, DataTable render, and
+ * bulk approve / reject. Flow enrichment still fans out per-flow since the
+ * backend only exposes approvals scoped to a flow.
  */
 export default function ApprovalsPage() {
-  const { data: activityData, isLoading: activityLoading } = useSWR(
+  const { data: activityData } = useSWR(
     '/api/activity?approvals',
     () => activity.list().then((r) => r.data as ActivityEvent[]),
     { refreshInterval: 15_000 },
@@ -62,11 +66,10 @@ export default function ApprovalsPage() {
 
   const flowIds = React.useMemo(() => [...flowMap.keys()], [flowMap])
 
-  // Single SWR key composed from the flow list. The fetcher fans out to each
-  // flow's approvals endpoint and flattens the response.
   const {
     data: approvals,
-    isLoading: approvalsLoading,
+    isLoading,
+    mutate,
   } = useSWR<Enriched[]>(
     flowIds.length ? ['approvals-bulk', flowIds.join(',')] : null,
     async () => {
@@ -86,14 +89,124 @@ export default function ApprovalsPage() {
     { refreshInterval: 15_000 },
   )
 
-  const [tab, setTab] = React.useState<'pending' | 'resolved' | 'all'>('pending')
+  const [filters, setFilters] = useUrlStateMulti(DEFAULTS)
+  const [density] = useDensity()
+  const [selected, setSelected] = React.useState<Set<string>>(new Set())
 
   const all = approvals ?? []
   const pending = all.filter((a) => a.status === 'pending')
   const resolved = all.filter((a) => a.status !== 'pending')
-  const visible = tab === 'pending' ? pending : tab === 'resolved' ? resolved : all
+  const visible = filters.tab === 'pending' ? pending : filters.tab === 'resolved' ? resolved : all
 
-  const isLoading = activityLoading || approvalsLoading
+  const sort: SortState =
+    filters.sort ? { columnId: filters.sort, direction: (filters.dir || 'asc') as 'asc' | 'desc' } : null
+
+  const selectedRows = visible.filter((a) => selected.has(a.id))
+
+  const handleBulk = async (kind: 'approve' | 'reject') => {
+    const rows = selectedRows.filter((a) => a.status === 'pending')
+    if (rows.length === 0) {
+      toast.info('No pending items in selection')
+      return
+    }
+    if (
+      kind === 'reject' &&
+      !confirm(`Reject ${rows.length} approval(s)? Agents will abort the corresponding phase.`)
+    ) {
+      return
+    }
+    const fn = kind === 'approve' ? flowsApi.approve : flowsApi.reject
+    const results = await Promise.allSettled(rows.map((a) => fn(a.flow.id, a.id)))
+    const ok = results.filter((r) => r.status === 'fulfilled').length
+    toast.success(`${kind === 'approve' ? 'Approved' : 'Rejected'} ${ok}/${rows.length}`)
+    setSelected(new Set())
+    void mutate()
+  }
+
+  const columns: Column<Enriched>[] = React.useMemo(
+    () => [
+      {
+        id: 'description',
+        header: 'Approval',
+        sortable: true,
+        sortValue: (a) => a.description.toLowerCase(),
+        cell: (a) => (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border-subtle bg-bg-subtle shrink-0">
+              {a.status === 'pending' ? (
+                <ShieldAlert className="h-3.5 w-3.5 text-sev-high" />
+              ) : a.status === 'approved' ? (
+                <ShieldCheck className="h-3.5 w-3.5 text-accent" />
+              ) : (
+                <ShieldAlert className="h-3.5 w-3.5 text-sev-critical" />
+              )}
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-fg truncate">{a.description}</div>
+              <div className="meta-mono mt-0.5 truncate">
+                {a.flow.project_name ?? 'Project'} · {a.flow.name}
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'phase',
+        header: 'Phase',
+        sortable: true,
+        sortValue: (a) => a.phase,
+        hideOnMobile: true,
+        cell: (a) => <Badge variant="outline" className="uppercase">{PHASE_LABEL[a.phase]}</Badge>,
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        sortable: true,
+        sortValue: (a) => a.status,
+        cell: (a) => (
+          <Badge
+            variant="outline"
+            className={cn(
+              'uppercase',
+              a.status === 'pending' && 'text-sev-high border-sev-high/40',
+              a.status === 'approved' && 'text-accent border-accent/40',
+              a.status === 'rejected' && 'text-sev-critical border-sev-critical/40',
+            )}
+          >
+            {a.status}
+          </Badge>
+        ),
+      },
+      {
+        id: 'created',
+        header: 'Created',
+        sortable: true,
+        sortValue: (a) => new Date(a.created_at).getTime(),
+        align: 'right',
+        hideOnMobile: true,
+        cell: (a) => (
+          <span className="meta-mono" title={formatDateTime(a.created_at)}>
+            {timeAgo(a.created_at)}
+          </span>
+        ),
+      },
+      {
+        id: 'open',
+        header: '',
+        align: 'right',
+        width: 120,
+        cell: (a) => (
+          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
+            <Link href={`/flows/${a.flow.id}?tab=approvals`}>
+              Open
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </Button>
+        ),
+      },
+    ],
+    [],
+  )
 
   return (
     <PageShell>
@@ -108,7 +221,7 @@ export default function ApprovalsPage() {
       />
 
       <div className="mt-6">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+        <Tabs value={filters.tab} onValueChange={(v) => setFilters({ tab: v })}>
           <TabsList>
             <TabsTrigger value="pending">
               Pending
@@ -124,123 +237,70 @@ export default function ApprovalsPage() {
         </Tabs>
       </div>
 
-      <div className="mt-6 flex flex-col gap-3">
-        {isLoading ? (
-          <ListSkeleton />
-        ) : visible.length === 0 ? (
-          <EmptyState tab={tab} />
+      <div className="mt-6">
+        <BulkActionsBar count={selected.size} onClear={() => setSelected(new Set())}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs gap-1.5"
+            onClick={() => handleBulk('approve')}
+          >
+            <Check className="h-3.5 w-3.5 text-accent" />
+            Approve
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs gap-1.5 text-sev-critical border-sev-critical/40 hover:bg-sev-critical/10"
+            onClick={() => handleBulk('reject')}
+          >
+            <X className="h-3.5 w-3.5" />
+            Reject
+          </Button>
+        </BulkActionsBar>
+
+        {visible.length === 0 && !isLoading ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center text-center gap-3 py-14 px-6">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-bg-subtle">
+                <Inbox className="h-4 w-4 text-fg-subtle" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-fg">
+                  {filters.tab === 'pending'
+                    ? 'Inbox zero'
+                    : filters.tab === 'resolved'
+                      ? 'Nothing resolved yet'
+                      : 'No approvals recorded'}
+                </div>
+                <div className="mt-1 text-xs text-fg-muted max-w-sm">
+                  {filters.tab === 'pending'
+                    ? 'No flow is currently waiting on you. Phase-gated approvals appear here the moment an agent requests one.'
+                    : 'Approve or reject a request from a flow and it will show up here.'}
+                </div>
+              </div>
+              <Link href="/flows" className="text-xs text-accent hover:underline underline-offset-4">
+                Browse flows →
+              </Link>
+            </CardContent>
+          </Card>
         ) : (
-          visible.map((a) => <ApprovalRow key={a.id} approval={a} />)
+          <DataTable
+            ariaLabel="Approvals"
+            columns={columns}
+            rows={visible}
+            getRowId={(a) => a.id}
+            selected={selected}
+            onSelectChange={setSelected}
+            sort={sort}
+            onSortChange={(s) =>
+              setFilters({ sort: s?.columnId ?? '', dir: s?.direction ?? '' })
+            }
+            density={density}
+            loading={isLoading}
+          />
         )}
       </div>
     </PageShell>
-  )
-}
-
-function ApprovalRow({ approval: a }: { approval: Enriched }) {
-  const tone =
-    a.status === 'pending'
-      ? 'border-sev-high/30 bg-sev-high/[0.02]'
-      : a.status === 'approved'
-        ? 'border-accent/30 bg-accent/[0.02]'
-        : 'border-sev-critical/30 bg-sev-critical/[0.02]'
-
-  const icon =
-    a.status === 'pending' ? (
-      <ShieldAlert className="h-3.5 w-3.5 text-sev-high" />
-    ) : a.status === 'approved' ? (
-      <ShieldCheck className="h-3.5 w-3.5 text-accent" />
-    ) : (
-      <ShieldAlert className="h-3.5 w-3.5 text-sev-critical" />
-    )
-
-  return (
-    <Card className={cn('overflow-hidden border', tone)}>
-      <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 pb-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border-subtle bg-bg-subtle">
-            {icon}
-          </span>
-          <div className="min-w-0">
-            <CardTitle className="text-sm truncate">{a.description}</CardTitle>
-            <div className="mt-0.5 text-2xs text-fg-subtle font-mono truncate">
-              {a.flow.project_name ?? 'Project'} · {a.flow.name} · {timeAgo(a.created_at)} ·{' '}
-              {formatDateTime(a.created_at)}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Badge variant="outline" className="uppercase">
-            {PHASE_LABEL[a.phase]}
-          </Badge>
-          <Badge
-            variant="outline"
-            className={cn(
-              'uppercase',
-              a.status === 'pending' && 'text-sev-high border-sev-high/40',
-              a.status === 'approved' && 'text-accent border-accent/40',
-              a.status === 'rejected' && 'text-sev-critical border-sev-critical/40',
-            )}
-          >
-            {a.status}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0 pb-3">
-        <div className="flex items-center justify-end">
-          <Button asChild variant="ghost" size="sm" rightIcon={<ArrowUpRight />}>
-            <Link href={`/flows/${a.flow.id}?tab=approvals`}>Open flow</Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ListSkeleton() {
-  return (
-    <>
-      {Array.from({ length: 3 }).map((_, i) => (
-        <Card key={i}>
-          <CardContent className="p-4 flex items-center gap-3">
-            <Skeleton className="h-7 w-7 rounded-md" />
-            <div className="flex-1">
-              <Skeleton className="h-3 w-64" />
-              <Skeleton className="h-2.5 w-80 mt-2" />
-            </div>
-            <Skeleton className="h-5 w-20 rounded-full" />
-          </CardContent>
-        </Card>
-      ))}
-    </>
-  )
-}
-
-function EmptyState({ tab }: { tab: 'pending' | 'resolved' | 'all' }) {
-  return (
-    <Card>
-      <CardContent className="flex flex-col items-center justify-center text-center gap-3 py-14 px-6">
-        <div className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-bg-subtle">
-          <Inbox className="h-4 w-4 text-fg-subtle" />
-        </div>
-        <div>
-          <div className="text-sm font-medium text-fg">
-            {tab === 'pending'
-              ? 'Inbox zero'
-              : tab === 'resolved'
-                ? 'Nothing resolved yet'
-                : 'No approvals recorded'}
-          </div>
-          <div className="mt-1 text-xs text-fg-muted max-w-sm">
-            {tab === 'pending'
-              ? 'No flow is currently waiting on you. Phase-gated approvals appear here the moment an agent requests one.'
-              : 'Approve or reject a request from a flow and it will show up here.'}
-          </div>
-        </div>
-        <Link href="/flows" className="text-xs text-accent hover:underline underline-offset-4">
-          Browse flows →
-        </Link>
-      </CardContent>
-    </Card>
   )
 }

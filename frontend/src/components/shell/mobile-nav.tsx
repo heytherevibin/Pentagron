@@ -22,14 +22,21 @@ export function MobileNav({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-72 p-0 bg-bg border-border">
+      <SheetContent
+        side="left"
+        className={cn(
+          'w-[min(85vw,300px)] p-0 bg-bg border-border',
+          // honour notch on the leading edge when installed as PWA
+          'pl-[env(safe-area-inset-left)]',
+        )}
+      >
         <SheetHeader className="h-14 px-4 flex flex-row items-center justify-start border-b border-border-subtle">
           <SheetTitle className="flex items-center">
             <Wordmark className="text-lg" />
           </SheetTitle>
         </SheetHeader>
 
-        <nav className="px-2 py-3">
+        <nav className="px-2 py-3 overflow-y-auto max-h-[calc(100dvh-3.5rem)]">
           <ul className="flex flex-col gap-5">
             {NAV_SECTIONS.map((section) => (
               <li key={section.label}>
@@ -47,15 +54,16 @@ export function MobileNav({
                           onClick={() => onOpenChange(false)}
                           aria-current={active ? 'page' : undefined}
                           className={cn(
-                            'inline-flex items-center gap-2.5 w-full rounded-md h-9 px-2.5',
+                            'inline-flex items-center gap-3 w-full rounded-md h-11 px-3',
                             'transition-colors duration-120',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55',
                             active
                               ? 'bg-bg-subtle text-fg'
-                              : 'text-fg-muted hover:text-fg hover:bg-bg-subtle/60',
+                              : 'text-fg-muted hover:text-fg hover:bg-bg-subtle/60 active:bg-bg-subtle',
                           )}
                         >
-                          <Icon className={cn('h-3.5 w-3.5', active ? 'text-accent' : 'text-fg-subtle')} />
-                          <span className="text-xs font-medium">{item.label}</span>
+                          <Icon className={cn('h-4 w-4', active ? 'text-accent' : 'text-fg-subtle')} />
+                          <span className="text-sm font-medium">{item.label}</span>
                         </Link>
                       </li>
                     )

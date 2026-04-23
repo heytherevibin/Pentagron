@@ -79,11 +79,13 @@ export const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex cursor-default select-none items-center gap-2 px-2 py-1.5 rounded',
+      'relative flex cursor-default select-none items-center gap-2 px-2 py-2 rounded',
       'text-sm leading-none text-fg outline-none',
       'transition-colors duration-120',
       'focus:bg-bg-muted focus:text-fg',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-40',
+      // Coarse pointers get a comfortable 40px row; precise pointers stay compact.
+      '[@media(pointer:coarse)]:min-h-[40px]',
       inset && 'pl-7',
       destructive && 'text-sev-critical focus:bg-sev-critical/10 focus:text-sev-critical',
       '[&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-fg-subtle',

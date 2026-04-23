@@ -63,7 +63,7 @@ export default function DashboardPage() {
   ).length
 
   return (
-    <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
+    <div className="mx-auto w-full max-w-[1320px] px-shell py-6 sm:py-8 lg:py-10">
       {/* ── Greeting + CTA ───────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
@@ -94,7 +94,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Hero stats strip ─────────────────────────────────────────────── */}
-      <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="mt-6 sm:mt-8 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
           index={0}
           label="Projects"
@@ -130,7 +130,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Main grid ────────────────────────────────────────────────────── */}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
+      <div className="mt-6 sm:mt-8 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
         {/* Recent flows */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
